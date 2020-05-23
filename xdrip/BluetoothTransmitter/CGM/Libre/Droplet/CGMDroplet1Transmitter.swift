@@ -18,6 +18,9 @@ class CGMDroplet1Transmitter:BluetoothTransmitter, CGMTransmitter {
     /// will be used to pass back bluetooth and cgm related events
     private(set) weak var cgmTransmitterDelegate: CGMTransmitterDelegate?
     
+    /// CGMDropletTransmitterDelegate
+    public weak var cGMDropletTransmitterDelegate: CGMDropletTransmitterDelegate?
+    
     /// for trace
     private let log = OSLog(subsystem: ConstantsLog.subSystem, category: ConstantsLog.categoryCGMDroplet1)
     
@@ -28,7 +31,9 @@ class CGMDroplet1Transmitter:BluetoothTransmitter, CGMTransmitter {
     /// - parameters:
     ///     - address: if already connected before, then give here the address that was received during previous connect, if not give nil
     ///     - name : if already connected before, then give here the name that was received during previous connect, if not give nil
-    init(address:String?, name: String?, delegate:CGMTransmitterDelegate) {
+    ///     - bluetoothTransmitterDelegate : a NluetoothTransmitterDelegate
+    ///     - cGMTransmitterDelegate : a CGMTransmitterDelegate
+    init(address:String?, name: String?, bluetoothTransmitterDelegate: BluetoothTransmitterDelegate, cGMDropletTransmitterDelegate : CGMDropletTransmitterDelegate, cGMTransmitterDelegate:CGMTransmitterDelegate) {
         
         // assign addressname and name or expected devicename
         var newAddressAndName:BluetoothTransmitter.DeviceAddressAndName = BluetoothTransmitter.DeviceAddressAndName.notYetConnected(expectedName: "limitter")
@@ -37,37 +42,16 @@ class CGMDroplet1Transmitter:BluetoothTransmitter, CGMTransmitter {
         }
         
         // assign CGMTransmitterDelegate
-        cgmTransmitterDelegate = delegate
+        self.cgmTransmitterDelegate = cGMTransmitterDelegate
         
-        super.init(addressAndName: newAddressAndName, CBUUID_Advertisement: nil, servicesCBUUIDs: [CBUUID(string: CBUUID_Service_Droplet)], CBUUID_ReceiveCharacteristic: CBUUID_ReceiveCharacteristic_Droplet, CBUUID_WriteCharacteristic: CBUUID_WriteCharacteristic_Droplet, startScanningAfterInit: CGMTransmitterType.Droplet1.startScanningAfterInit(), bluetoothTransmitterDelegate: nil)
+        // assign cGMDropletTransmitterDelegate
+        self.cGMDropletTransmitterDelegate = cGMDropletTransmitterDelegate
+        
+        super.init(addressAndName: newAddressAndName, CBUUID_Advertisement: nil, servicesCBUUIDs: [CBUUID(string: CBUUID_Service_Droplet)], CBUUID_ReceiveCharacteristic: CBUUID_ReceiveCharacteristic_Droplet, CBUUID_WriteCharacteristic: CBUUID_WriteCharacteristic_Droplet, bluetoothTransmitterDelegate: bluetoothTransmitterDelegate)
         
     }
     
     // MARK: - overriden  BluetoothTransmitter functions
-    
-    override func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        
-        super.centralManager(central, didConnect: peripheral)
-        
-        cgmTransmitterDelegate?.cgmTransmitterDidConnect(address: deviceAddress, name: deviceName)
-
-    }
-    
-    override func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        
-        super.centralManagerDidUpdateState(central)
-        
-        cgmTransmitterDelegate?.deviceDidUpdateBluetoothState(state: central.state)
-        
-    }
-
-    override func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        
-        super.centralManager(central, didDisconnectPeripheral: peripheral, error: error)
-     
-        cgmTransmitterDelegate?.cgmTransmitterDidDisconnect()
-        
-    }
     
     override func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         
@@ -125,10 +109,13 @@ class CGMDroplet1Transmitter:BluetoothTransmitter, CGMTransmitter {
                 return
             }
             
-            // send to delegate
+            // send glucoseDataArray, transmitterBatteryInfo and sensorTimeInMinutes to cgmTransmitterDelegate
             var glucoseDataArray = [GlucoseData(timeStamp: Date(), glucoseLevelRaw: rawValueAsDouble)]
-            cgmTransmitterDelegate?.cgmTransmitterInfoReceived(glucoseData: &glucoseDataArray, transmitterBatteryInfo: TransmitterBatteryInfo.percentage(percentage: batteryPercentage), sensorState: nil, sensorTimeInMinutes: sensorTimeInMinutes * 10, firmware: nil, hardware: nil, hardwareSerialNumber: nil, bootloader: nil, sensorSerialNumber: nil)
+            cgmTransmitterDelegate?.cgmTransmitterInfoReceived(glucoseData: &glucoseDataArray, transmitterBatteryInfo: TransmitterBatteryInfo.percentage(percentage: batteryPercentage), sensorTimeInMinutes: sensorTimeInMinutes * 10)
             
+            // send transmitterBatteryInfo to delegate
+            cGMDropletTransmitterDelegate?.received(batteryLevel: batteryPercentage, from: self)
+
         } else {
             trace("    value is nil, no further processing", log: log, category: ConstantsLog.categoryCGMDroplet1, type: .error)
         }
@@ -137,21 +124,24 @@ class CGMDroplet1Transmitter:BluetoothTransmitter, CGMTransmitter {
     
     // MARK: CGMTransmitter protocol functions
     
-    /// to ask pairing - empty function because Bubble doesn't need pairing
-    ///
-    /// this function is not implemented in BluetoothTransmitter.swift, otherwise it might be forgotten to look at in future CGMTransmitter developments
-    func initiatePairing() {}
-    
-    /// to ask transmitter reset - empty function because Bubble doesn't support reset
-    ///
-    /// this function is not implemented in BluetoothTransmitter.swift, otherwise it might be forgotten to look at in future CGMTransmitter developments
-    func reset(requested:Bool) {}
-    
     /// this transmitter does not support oopWeb
     func setWebOOPEnabled(enabled: Bool) {
     }
 
-    /// this transmitter does not support oop web
-    func setWebOOPSiteAndToken(oopWebSite: String, oopWebToken: String) {}
+    func setWebOOPSite(oopWebSite: String) {}
+    
+    func setWebOOPToken(oopWebToken: String) {}
+    
+    func cgmTransmitterType() -> CGMTransmitterType {
+        return .Droplet1
+    }
+    
+    func isWebOOPEnabled() -> Bool {
+        return false
+    }
 
+    func requestNewReading() {
+        // not supported for blucon
+    }
+    
 }

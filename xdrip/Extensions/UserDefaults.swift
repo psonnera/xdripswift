@@ -26,14 +26,6 @@ extension UserDefaults {
         
         /// transmitter type
         case transmitterTypeAsString = "transmitterTypeAsString"
-        /// transmitterid
-        case transmitterId = "transmitterId"
-        /// is web OOP enabled or not
-        case webOOPEnabled = "webOOPEnabled"
-        /// if webOOP enabled, what site to use
-        case webOOPsite = "webOOPsite"
-        /// if webOOP enabled, value of the token
-        case webOOPtoken = "webOOPtoken"
 
         // Nightscout
         
@@ -86,8 +78,6 @@ extension UserDefaults {
         case speakTrend = "speakTrend"
         /// speak interval
         case speakInterval = "speakInterval"
-        /// speak rate
-        case speakRate = "speakRate"
         
         // Settings that Keep track of alert and info messages shown to the user ======
         
@@ -145,13 +135,12 @@ extension UserDefaults {
         
         // Other Settings (not user configurable)
         
-        // cgm Transmitter
-        /// active transmitter address
-        case cgmTransmitterDeviceAddress = "cgmTransmitterDeviceAddress"
-        /// active transmitter name
-        case cgmTransmitterDeviceName = "cgmTransmitterDeviceName"
-        /// timestamp of last bluetooth disconnect to transmitter
-        case lastdisConnectTimestamp = "lastdisConnectTimestamp"
+        /// - in case missed reading alert settings are changed by user, this value will be set to true
+        /// - alertmanager will observe that value and when changed, verify if missed reading alert needs to be changed
+        case missedReadingAlertChanged = "missedReadingAlertChanged"
+        
+        /// when was the app launched, used in trace info that is sent via email. Just to be able to see afterwards if the app ever crashed. Because sometimes users say it crashed, but maybe it just stopped receiving readings and restarted by opening the app, but didn't really crash
+        case timeStampAppLaunch = "timeStampAppLaunch"
         
         // Nightscout
         /// timestamp lastest reading uploaded to NightScout
@@ -160,8 +149,6 @@ extension UserDefaults {
         // Transmitter
         /// Transmitter Battery Level
         case transmitterBatteryInfo = "transmitterbatteryinfo"
-        /// Dexcom transmitter reset required
-        case transmitterResetRequired = "transmitterResetRequired"
         
         // HealthKit
         /// did user authorize the storage of readings in healthkit or not
@@ -173,10 +160,6 @@ extension UserDefaults {
         // Dexcom Share
         /// timestamp of latest reading uploaded to Dexcom Share
         case timeStampLatestDexcomShareUploadedBgReading = "timeStampLatestDexcomShareUploadedBgReading"
-        
-        // Sensor
-        /// sensor Serial Number, for now only applicable to Libre
-        case sensorSerialNumber = "sensorSerialNumber"
         
         // development settings
         
@@ -191,6 +174,9 @@ extension UserDefaults {
         
         /// OSLogEnabled enabled or not
         case OSLogEnabled = "OSLogEnabled"
+        
+        /// to merge from 3.x to 4.x, can be deleted once 3.x is not used anymore
+        case cgmTransmitterDeviceAddress = "cgmTransmitterDeviceAddress"
         
     }
     
@@ -323,10 +309,10 @@ extension UserDefaults {
 
     // MARK: Transmitter Settings
     
-    /// setting a new transmittertype will also set the transmitterid to nil
-    var transmitterType:CGMTransmitterType? {
+    /// cgm ransmittertype currently active
+    var cgmTransmitterType:CGMTransmitterType? {
         get {
-            if let transmitterTypeAsString = transmitterTypeAsString {
+            if let transmitterTypeAsString = cgmTransmitterTypeAsString {
                 return CGMTransmitterType(rawValue: transmitterTypeAsString)
             } else {
                 return nil
@@ -335,7 +321,7 @@ extension UserDefaults {
     }
     
     /// transmittertype as String, just to be able to define dynamic dispatch and obj-c visibility
-    @objc dynamic var transmitterTypeAsString:String? {
+    @objc dynamic var cgmTransmitterTypeAsString:String? {
         get {
             return string(forKey: Key.transmitterTypeAsString.rawValue)
         }
@@ -343,55 +329,8 @@ extension UserDefaults {
             // if transmittertype has changed then also reset the transmitter id to nil
             // this is also a check to see if transmitterTypeAsString has really changed, because just calling a set without a new value may cause a transmittertype reset in other parts of the call (inclusive stopping sensor etc.)
             if newValue != string(forKey: Key.transmitterTypeAsString.rawValue) {
-                set(nil, forKey: Key.transmitterId.rawValue)
                 set(newValue, forKey: Key.transmitterTypeAsString.rawValue)
             }
-        }
-    }
-    
-    /// transmitter id
-    @objc dynamic var transmitterId:String? {
-        get {
-            return string(forKey: Key.transmitterId.rawValue)
-        }
-        set {
-            set(newValue, forKey: Key.transmitterId.rawValue)
-        }
-    }
-    
-    /// web oop enabled
-    @objc dynamic var webOOPEnabled: Bool {
-        get {
-            return bool(forKey: Key.webOOPEnabled.rawValue)
-        }
-        set {
-            set(newValue, forKey: Key.webOOPEnabled.rawValue)
-        }
-    }
-    
-    /// web oop site
-    @objc dynamic var webOOPSite:String? {
-        get {
-            return string(forKey: Key.webOOPsite.rawValue)
-        }
-        set {
-            var value = newValue
-            if let newValue = newValue {
-                if !newValue.startsWith("http") {
-                    value = "https://" + newValue
-                }
-            }
-            set(value, forKey: Key.webOOPsite.rawValue)
-        }
-    }
-
-    /// web oop token
-    @objc dynamic var webOOPtoken:String? {
-        get {
-            return string(forKey: Key.webOOPtoken.rawValue)
-        }
-        set {
-            set(newValue, forKey: Key.webOOPtoken.rawValue)
         }
     }
     
@@ -435,21 +374,7 @@ extension UserDefaults {
             return string(forKey: Key.nightScoutUrl.rawValue)
         }
         set {
-            var value = newValue
-            if let newValue = newValue {
-                
-                // if url doesn't start with http, then add https
-                if !newValue.startsWith("http") {
-                    value = "https://" + newValue
-                }
-                
-                // if url ends with /, remove it
-                if value!.last == "/" {
-                    value!.removeLast()
-                }
-                
-            }
-            set(value, forKey: Key.nightScoutUrl.rawValue)
+            set(newValue, forKey: Key.nightScoutUrl.rawValue)
         }
     }
     
@@ -611,16 +536,6 @@ extension UserDefaults {
         }
         set {
             set(newValue, forKey: Key.speakInterval.rawValue)
-        }
-    }
-    
-    /// speak readings interval in minutes, if nil then default value to be used
-    @objc dynamic var speakRate: Double {
-        get {
-            return double(forKey: Key.speakRate.rawValue)
-        }
-        set {
-            set(newValue, forKey: Key.speakRate.rawValue)
         }
     }
     
@@ -788,30 +703,24 @@ extension UserDefaults {
     
     // MARK: - =====  Other Settings ======
     
-    var cgmTransmitterDeviceAddress: String? {
+    /// - in case missed reading alert settings are changed by user, this value will be set to true
+    /// - alertmanager will observe that value and when changed, verify if missed reading alert needs to be changed
+    @objc dynamic var missedReadingAlertChanged: Bool {
         get {
-            return string(forKey: Key.cgmTransmitterDeviceAddress.rawValue)
+            return bool(forKey: Key.missedReadingAlertChanged.rawValue)
         }
         set {
-            set(newValue, forKey: Key.cgmTransmitterDeviceAddress.rawValue)
-        }
-    }
-    
-    var cgmTransmitterDeviceName: String? {
-        get {
-            return string(forKey: Key.cgmTransmitterDeviceName.rawValue)
-        }
-        set {
-            set(newValue, forKey: Key.cgmTransmitterDeviceName.rawValue)
+            set(newValue, forKey: Key.missedReadingAlertChanged.rawValue)
         }
     }
 
-    var lastdisConnectTimestamp:Date? {
+    /// when was the app launched, used in trace info that is sent via email. Just to be able to see afterwards if the app ever crashed. Because sometimes users say it crashed, but maybe it just stopped receiving readings and restarted by opening the app, but didn't really crash
+    var timeStampAppLaunch:Date? {
         get {
-            return object(forKey: Key.lastdisConnectTimestamp.rawValue) as? Date
+            return object(forKey: Key.timeStampAppLaunch.rawValue) as? Date
         }
         set {
-            set(newValue, forKey: Key.lastdisConnectTimestamp.rawValue)
+            set(newValue, forKey: Key.timeStampAppLaunch.rawValue)
         }
     }
     
@@ -825,7 +734,7 @@ extension UserDefaults {
         }
     }
     
-    /// transmitterBatteryInfo
+    /// transmitterBatteryInfo, this should be the transmitter battery info of the latest active cgmTransmitter
     var transmitterBatteryInfo:TransmitterBatteryInfo? {
         get {
             if let data = object(forKey: Key.transmitterBatteryInfo.rawValue) as? Data {
@@ -844,16 +753,6 @@ extension UserDefaults {
         }
     }
     
-    /// is transmitter reset required or not
-    @objc dynamic var transmitterResetRequired: Bool {
-        get {
-            return bool(forKey: Key.transmitterResetRequired.rawValue)
-        }
-        set {
-            set(newValue, forKey: Key.transmitterResetRequired.rawValue)
-        }
-    }
-      
     /// did user authorize the storage of readings in healthkit or not - this setting is actually only used to allow the HealthKitManager to listen for changes in the authorization status
     var storeReadingsInHealthkitAuthorized:Bool {
         get {
@@ -881,16 +780,6 @@ extension UserDefaults {
         }
         set {
             set(newValue, forKey: Key.timeStampLatestDexcomShareUploadedBgReading.rawValue)
-        }
-    }
-    
-    /// sensor serial number, for now only useful for Libre sensor
-    var sensorSerialNumber:String? {
-        get {
-            return string(forKey: Key.sensorSerialNumber.rawValue)
-        }
-        set {
-            set(newValue, forKey: Key.sensorSerialNumber.rawValue)
         }
     }
     
@@ -935,7 +824,16 @@ extension UserDefaults {
             set(newValue, forKey: Key.OSLogEnabled.rawValue)
         }
     }
-
+    
+    /// to merge from 3.x to 4.x, can be deleted once 3.x is not used anymore
+    var cgmTransmitterDeviceAddress: String? {
+        get {
+            return string(forKey: Key.cgmTransmitterDeviceAddress.rawValue)
+        }
+        set {
+            set(newValue, forKey: Key.cgmTransmitterDeviceAddress.rawValue)
+        }
+    }
     
 }
 

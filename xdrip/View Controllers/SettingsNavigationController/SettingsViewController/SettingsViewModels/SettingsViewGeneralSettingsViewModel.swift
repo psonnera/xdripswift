@@ -28,6 +28,14 @@ fileprivate enum Setting:Int, CaseIterable {
 /// conforms to SettingsViewModelProtocol for all general settings in the first sections screen
 struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
     
+    func storeRowReloadClosure(rowReloadClosure: ((Int) -> Void)) {}
+    
+    func storeUIViewController(uIViewController: UIViewController) {}
+
+    func storeMessageHandler(messageHandler: ((String, String) -> Void)) {
+        // this ViewModel does need to send back messages to the viewcontroller asynchronously
+    }
+    
     func completeSettingsViewRefreshNeeded(index: Int) -> Bool {
         
         // changing follower to master or master to follower requires changing ui for nightscout settings and transmitter type settings
@@ -92,7 +100,7 @@ struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
         switch setting {
             
         case .bloodGlucoseUnit:
-            return Texts_Common.bloodGLucoseUnit
+            return Texts_SettingsView.labelSelectBgUnit
             
         case .lowMarkValue:
             return Texts_SettingsView.labelLowValue

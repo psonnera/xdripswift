@@ -8,10 +8,19 @@ fileprivate enum Setting:Int, CaseIterable {
     /// to enable OSLog
     case OSLogEnabled = 1
     
+
 }
 
 struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
     
+    func storeRowReloadClosure(rowReloadClosure: @escaping ((Int) -> Void)) {}
+    
+    func storeUIViewController(uIViewController: UIViewController) {}
+    
+    func storeMessageHandler(messageHandler: ((String, String) -> Void)) {
+        // this ViewModel does need to send back messages to the viewcontroller asynchronously
+    }
+
     func sectionTitle() -> String? {
         return "Developer Settings"
     }
@@ -27,6 +36,7 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
             
         case .OSLogEnabled:
             return "OSLog"
+
             
         }
     }
@@ -50,10 +60,10 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
         switch setting {
             
         case .NSLogEnabled:
-            return "NSLog"
+            return nil
             
         case .OSLogEnabled:
-            return "OSLog"
+            return nil
             
         }
         
@@ -97,6 +107,7 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
             
         case .NSLogEnabled, .OSLogEnabled:
             return .nothing
+            
         }
     }
     

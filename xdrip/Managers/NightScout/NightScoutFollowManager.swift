@@ -328,7 +328,11 @@ class NightScoutFollowManager:NSObject {
         // create playSoundTimer
         playSoundTimer = RepeatingTimer(timeInterval: TimeInterval(ConstantsSuspensionPrevention.interval), eventHandler: {
                 // play the sound
+            
+             trace("in eventhandler checking if audioplayer exists", log: self.log, category: ConstantsLog.categoryNightScoutFollowManager, type: .info)
+            
                 if let audioPlayer = self.audioPlayer, !audioPlayer.isPlaying {
+                    trace("playing audio", log: self.log, category: ConstantsLog.categoryNightScoutFollowManager, type: .info)
                     audioPlayer.play()
                 }
             })
@@ -373,9 +377,8 @@ class NightScoutFollowManager:NSObject {
         }
     }
     
-    // MARK:- observe function
+    // MARK:- overriden function
     
-    /// when user changes from master to follower or vice versa, processing is needed
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         
         if let keyPath = keyPath {

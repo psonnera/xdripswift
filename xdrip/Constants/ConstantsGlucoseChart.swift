@@ -33,17 +33,17 @@ enum ConstantsGlucoseChart {
     /// if the maximum in initialGlucoseValueRangeInMgDl isn't enough to show all values, if there's no readings to show with value higher than the maximum in this array, then this array will determine the maximum possible value in the chart, in mgdl
     static let thirdGlucoseValueRangeInMmol = [21.0, 23.0]
     
-    /// axis line color
-    static let axisLineColor = UIColor.black
+    /// axis line color    (make white to match new dark UI theme)
+    static let axisLineColor = UIColor.gray
     
-    /// axis line label
-    static let axisLabelColor = UIColor.black
+    /// axis line label    (make white to match new dark UI theme)
+    static let axisLabelColor = UIColor.white
     
     /// grid color
     static let gridColor = UIColor.gray
     
     /// glucose color
-    static let glucoseTintColor = UIColor.green
+    static let glucoseTintColor = UIColor.cyan
     
     /// labels width for vertical axis
     static let yAxisLabelsWidth: CGFloat = 30
@@ -67,7 +67,7 @@ enum ConstantsGlucoseChart {
     static let axisTitleLabelsToLabelsSpacing: CGFloat = 0
     
     /// diameter of the circle for blood glucose readings
-    static let glucoseCircleDiameter: CGFloat = 5
+    static let glucoseCircleDiameter: CGFloat = 6
     
     /// when user pans the chart, when ending the gesture, deceleration is done. At regular intervals the chart needs to be redrawn. This is the interval in seconds
     static let decelerationTimerValueInSeconds = 0.030

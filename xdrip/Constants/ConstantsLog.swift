@@ -67,6 +67,12 @@ enum ConstantsLog {
     /// application data for M5Stack
     static let categoryApplicationDataWatlaa = "ApplicationDataWatlaa"
     
+    /// application data for BLEPeripheral
+    static let categoryApplicationDataBLEPeripheral = "ApplicationDataBLEPeripheral"
+    
+    /// application data for DexcomG5
+    static let categoryApplicationDataDexcomG5 = "ApplicationDataDexcomG5"
+    
     /// application for for M5StackName
     static let categoryApplicationDataM5StackNames = "ApplicationDataM5StackNames   "
     
@@ -115,5 +121,11 @@ enum ConstantsLog {
     /// WatchManager logging
     static let categoryWatchManager =                "WatchManager                  "
     
+    /// bluetoothPeripheralViewController
+    static let categoryBluetoothPeripheralViewController =   "blePeripheralViewController   "
+    
+    static let categoryNightScoutSettingsViewModel =         "nightScoutSettingsViewModel   "
+    
+    static let categoryTraceSettingsViewModel =      "TraceSettingsViewModel"
 }
 
