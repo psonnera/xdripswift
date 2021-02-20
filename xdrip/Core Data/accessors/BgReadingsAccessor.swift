@@ -12,21 +12,54 @@ class BgReadingsAccessor {
     /// CoreDataManager to use
     private let coreDataManager:CoreDataManager
     
-    /// to be used when fetch request needs to run on a background thread
-    private let privateManagedObjectContext: NSManagedObjectContext
-    
     // MARK: - initializer
     
     init(coreDataManager:CoreDataManager) {
         
         self.coreDataManager = coreDataManager
         
-        privateManagedObjectContext = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
-        privateManagedObjectContext.persistentStoreCoordinator = coreDataManager.mainManagedObjectContext.persistentStoreCoordinator
-        
     }
     
     // MARK: - public functions
+    
+    /// - Gives 2 latest readings with calculatedValue != 0, minimum time between the two readings specified by minimumTimeIntervalInMinutes
+    ///
+    /// - parameters:
+    ///     - minimumTimeIntervalInMinutes : minimum time between the two readings in seconds
+    /// - returns: 0 1 or 2 readings, minimum time diff between the two readings
+    ///     Order by timestamp, descending meaning the reading at index 0 is the youngest
+    func get2LatestBgReadings(minimumTimeIntervalInMinutes: Double) -> [BgReading] {
+        
+        // assuming there will be at most 1 reading per minute stored, feching minimumTimeIntervalInMinutes readings should be enough, adding 5 to be sure we fetch enough readings
+        let readingsToFetch = Int(minimumTimeIntervalInMinutes) + 5
+        
+        // to define the fromDate, assume there's one reading every 5 minutes, and multiple with readingsToFetch
+        let fromDate = Date(timeIntervalSinceNow: -(Double(readingsToFetch) * 5.0 * 60.0))
+        
+        // get latest readings
+        let latestReadings = getLatestBgReadings(limit: readingsToFetch, fromDate: fromDate, forSensor: nil, ignoreRawData: true, ignoreCalculatedValue: false)
+        
+        // if there's no readings, then return empty array
+        if latestReadings.count == 0 {return [BgReading]()}
+        
+        // if there's only one reading, then return it
+        if latestReadings.count == 1 {return [latestReadings[0]]}
+    
+        // there's more than one reading, search the first with time difference >= minimumTimeIntervalInMinutes
+        var indexNextReading = 1
+        while indexNextReading < latestReadings.count && (abs(latestReadings[indexNextReading].timeStamp.timeIntervalSince(latestReadings[0].timeStamp)) < minimumTimeIntervalInMinutes * 60.0 ) {
+
+            indexNextReading = indexNextReading + 1
+            
+        }
+        
+        // if indexNextReading = size of latestReadings, then it means we didn't find a second reading with time difference >= minimumTimeIntervalInMinutes, return only the first
+        if indexNextReading == latestReadings.count {return [latestReadings[0]]}
+        
+        // return the first, and the one found matching the expected time difference
+        return [latestReadings[0], latestReadings[indexNextReading]]
+        
+    }
     
     /// Gives readings for which calculatedValue != 0, rawdata != 0, matching sensorid if sensorid not nil, with maximumDays old
     ///
@@ -105,13 +138,14 @@ class BgReadingsAccessor {
         }
     }
     
-    /// gets readings on a managedObjectContact that is created with concurrencyType: .privateQueueConcurrencyType
+    /// gets bgReadings, synchronously, in the managedObjectContext's thread
     /// - returns:
     ///        readings sorted by timestamp, ascending (ie first is oldest)
     /// - parameters:
     ///     - to : if specified, only return readings with timestamp  smaller than fromDate (not equal to)
     ///     - from : if specified, only return readings with timestamp greater than fromDate (not equal to)
-    func getBgReadingsOnPrivateManagedObjectContext(from: Date?, to: Date?) -> [BgReading] {
+    ///     - managedObjectContext : the ManagedObjectContext to use
+    func getBgReadings(from: Date?, to: Date?, on managedObjectContext: NSManagedObjectContext) -> [BgReading] {
         
         let fetchRequest: NSFetchRequest<BgReading> = BgReading.fetchRequest()
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: #keyPath(BgReading.timeStamp), ascending: true)]
@@ -130,18 +164,42 @@ class BgReadingsAccessor {
         
         var bgReadings = [BgReading]()
         
-        privateManagedObjectContext.performAndWait {
+        managedObjectContext.performAndWait {
             do {
                 // Execute Fetch Request
                 bgReadings = try fetchRequest.execute()
             } catch {
                 let fetchError = error as NSError
-                trace("in getBgReadingOnPrivateManagedObjectContext, Unable to Execute BgReading Fetch Request : %{public}@", log: self.log, category: ConstantsLog.categoryApplicationDataBgReadings, type: .error, fetchError.localizedDescription)
+                trace("in getBgReadings, Unable to Execute BgReading Fetch Request : %{public}@", log: self.log, category: ConstantsLog.categoryApplicationDataBgReadings, type: .error, fetchError.localizedDescription)
             }
         }
         
         return bgReadings
 
+    }
+    
+    /// deletes bgReading, synchronously, in the managedObjectContext's thread
+    ///     - bgReading : bgReading to delete
+    ///     - managedObjectContext : the ManagedObjectContext to use
+    func delete(bgReading: BgReading, on managedObjectContext: NSManagedObjectContext) {
+        
+        managedObjectContext.performAndWait {
+            
+            managedObjectContext.delete(bgReading)
+            
+            // save changes to coredata
+            do {
+                
+                try managedObjectContext.save()
+                
+            } catch {
+                
+                trace("in delete bgReading,  Unable to Save Changes, error.localizedDescription  = %{public}@", log: self.log, category: ConstantsLog.categoryApplicationDataBgReadings, type: .error, error.localizedDescription)
+                
+            }
+
+        }
+        
     }
     
     // MARK: - private helper functions

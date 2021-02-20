@@ -24,6 +24,9 @@ class CGMBluconTransmitter: BluetoothTransmitter {
     /// if value starts with this string, then it's assume that a battery low indication is sent by the Blucon
     private let unknownCommand2BatteryLowIndicator = "8bda02"
     
+    /// is nonFixed enabled for the transmitter or not
+    private var nonFixedSlopeEnabled: Bool
+    
     /// for trace
     private let log = OSLog(subsystem: ConstantsLog.subSystem, category: ConstantsLog.categoryBlucon)
     
@@ -66,6 +69,9 @@ class CGMBluconTransmitter: BluetoothTransmitter {
     // timestamp of sending singleBlockInfoPrefix command, if time of receiving singleBlockInfoResponsePrefix is too late, then reading will be ignored
     private var timeStampOfSendingSingleBlockInfoPrefix:Date?
     
+    /// instance of libreDataParser
+    private let libreDataParser: LibreDataParser
+    
     // MARK: - public functions
     
     /// - parameters:
@@ -76,7 +82,7 @@ class CGMBluconTransmitter: BluetoothTransmitter {
     ///     - sensorSerialNumber : is needed to allow detection of a new sensor.
     ///     - bluetoothTransmitterDelegate : a NluetoothTransmitterDelegate
     ///     - cGMTransmitterDelegate : a CGMTransmitterDelegate
-    init(address:String?, name: String?, transmitterID:String, bluetoothTransmitterDelegate: BluetoothTransmitterDelegate, cGMBluconTransmitterDelegate: CGMBluconTransmitterDelegate, cGMTransmitterDelegate:CGMTransmitterDelegate, timeStampLastBgReading:Date?, sensorSerialNumber:String?) {
+    init(address:String?, name: String?, transmitterID:String, bluetoothTransmitterDelegate: BluetoothTransmitterDelegate, cGMBluconTransmitterDelegate: CGMBluconTransmitterDelegate, cGMTransmitterDelegate:CGMTransmitterDelegate, sensorSerialNumber:String?, nonFixedSlopeEnabled: Bool?) {
         
         // assign addressname and name or expected devicename
         // start by using expected device name
@@ -87,7 +93,7 @@ class CGMBluconTransmitter: BluetoothTransmitter {
         }
         
         // initialize timeStampLastBgReading
-        self.timeStampLastBgReading = timeStampLastBgReading ?? Date(timeIntervalSince1970: 0)
+        self.timeStampLastBgReading = Date(timeIntervalSince1970: 0)
         
         // initialize sensorSerialNumber
         self.sensorSerialNumber = sensorSerialNumber
@@ -97,6 +103,12 @@ class CGMBluconTransmitter: BluetoothTransmitter {
         
         // initialize rxbuffer
         rxBuffer = Data()
+        
+        // initialize nonFixedSlopeEnabled
+        self.nonFixedSlopeEnabled = nonFixedSlopeEnabled ?? false
+
+        // initiliaze LibreDataParser
+        self.libreDataParser = LibreDataParser()
 
         // initialize
         super.init(addressAndName: newAddressAndName, CBUUID_Advertisement: nil, servicesCBUUIDs: [CBUUID(string: CBUUID_BluconService)], CBUUID_ReceiveCharacteristic: CBUUID_ReceiveCharacteristic_Blucon, CBUUID_WriteCharacteristic: CBUUID_WriteCharacteristic_Blucon, bluetoothTransmitterDelegate: bluetoothTransmitterDelegate)
@@ -172,7 +184,8 @@ class CGMBluconTransmitter: BluetoothTransmitter {
             }
 
             //get readings from buffer and send to cGMTransmitterDelegate
-            var result = LibreDataParser.parse(libreData: rxBuffer, timeStampLastBgReading: timeStampLastBgReading)
+            // TODO: use libreDataParserlibreDataProcessor and make parseLibre1DataWithoutOOPWebCalibration private to LibreDataParser
+            var result = libreDataParser.parseLibre1Data(libreData: rxBuffer, libre1DerivedAlgorithmParameters: nil, testTimeStamp: nil)
             
             //TODO: sort glucosedata before calling newReadingsReceived
             cgmTransmitterDelegate?.cgmTransmitterInfoReceived(glucoseData: &result.glucoseData, transmitterBatteryInfo: nil, sensorTimeInMinutes: result.sensorTimeInMinutes)
@@ -310,8 +323,6 @@ class CGMBluconTransmitter: BluetoothTransmitter {
             
             // convert to string and log the value
             let valueAsString = value.hexEncodedString()
-            
-            trace("in peripheral didUpdateValueFor, data = %{public}@", log: log, category: ConstantsLog.categoryBlucon, type: .info, valueAsString)
             
             // get Opcode
             if let opCode = BluconTransmitterOpCode(withOpCodeValue: valueAsString) {
@@ -519,7 +530,7 @@ class CGMBluconTransmitter: BluetoothTransmitter {
                             // get glucoseValue from value
                             let glucoseValue = nowGetGlucoseValue(input: value)
                             
-                            let glucoseData = GlucoseData(timeStamp: timeStampLastBgReading, glucoseLevelRaw: glucoseValue, glucoseLevelFiltered: glucoseValue)
+                            let glucoseData = GlucoseData(timeStamp: timeStampLastBgReading, glucoseLevelRaw: glucoseValue)
                             var glucoseDataArray = [glucoseData]
                             cgmTransmitterDelegate?.cgmTransmitterInfoReceived(glucoseData: &glucoseDataArray, transmitterBatteryInfo: nil,  sensorTimeInMinutes: nil)
                             
@@ -560,6 +571,10 @@ extension CGMBluconTransmitter: CGMTransmitter {
     func requestNewReading() {
         // not supported for blucon
     }
+
+    func setNonFixedSlopeEnabled(enabled: Bool) {
+        nonFixedSlopeEnabled = enabled
+    }
     
     /// this transmitter does not support oopWeb
     func setWebOOPEnabled(enabled: Bool) {
@@ -571,6 +586,10 @@ extension CGMBluconTransmitter: CGMTransmitter {
     
     func cgmTransmitterType() -> CGMTransmitterType {
         return .Blucon
+    }
+
+    func isNonFixedSlopeEnabled() -> Bool {
+        return nonFixedSlopeEnabled
     }
     
     func isWebOOPEnabled() -> Bool {

@@ -4,6 +4,15 @@ import CoreBluetooth
 /// defines functions that every cgm transmitter should conform to
 protocol CGMTransmitter:AnyObject {
     
+    /// to set nonFixedSlopeEnabled - called when user changes the setting
+    ///
+    /// for transmitters who don't support non fixed slopes, there's no need to implemented this function<br>
+    /// ---  for transmitters who support non fixed (all Libre transmitters) this should be implemented
+    func setNonFixedSlopeEnabled(enabled:Bool)
+    
+    /// is the CGMTransmitter nonFixed enabled or not
+    func isNonFixedSlopeEnabled() -> Bool
+
     /// to set webOOPEnabled - called when user changes the setting
     ///
     /// for transmitters who don't support webOOP, there's no need to implemented this function<br>
@@ -12,16 +21,6 @@ protocol CGMTransmitter:AnyObject {
     
     /// is the CGMTransmitter web oop enabled or not
     func isWebOOPEnabled() -> Bool
-    
-    /// to set oopWebSite and
-    ///
-    /// for transmitters that don't support webOOP, there's no need to implemented this function
-    /// ---  for transmitters that support webOOP (Bubble, MiaoMiao, ..) this should be implemented
-    func setWebOOPSite(oopWebSite: String)
-
-    /// for transmitters that don't support webOOP, there's no need to implemented this function
-    /// ---  for transmitters that support webOOP (Bubble, MiaoMiao, ..) this should be implemented
-    func setWebOOPToken(oopWebToken: String)
     
     /// get cgmTransmitterType
     func cgmTransmitterType() -> CGMTransmitterType
@@ -61,8 +60,14 @@ enum CGMTransmitterType:String, CaseIterable {
     /// BlueReader
     case blueReader = "BlueReader"
     
+    /// Atom
+    case Atom = "Atom"
+    
     /// watlaa
     case watlaa = "Watlaa"
+    
+    /// Libre2
+    case Libre2 = "Libre2"
     
     /// what sensorType does this CGMTransmitter type support
     func sensorType() -> CGMSensorType {
@@ -72,7 +77,7 @@ enum CGMTransmitterType:String, CaseIterable {
         case .dexcomG4, .dexcomG5, .dexcomG6 :
             return .Dexcom
             
-        case .miaomiao, .Bubble, .GNSentry, .Droplet1, .blueReader, .watlaa, .Blucon :
+        case .miaomiao, .Bubble, .GNSentry, .Droplet1, .blueReader, .watlaa, .Blucon, .Libre2, .Atom:
             return .Libre
             
         }
@@ -111,6 +116,13 @@ enum CGMTransmitterType:String, CaseIterable {
             
         case .watlaa:
             return false
+            
+        case .Libre2:
+            return true
+            
+        case .Atom:
+            return true
+            
         }
     }
     
@@ -124,7 +136,7 @@ enum CGMTransmitterType:String, CaseIterable {
         case .dexcomG4, .dexcomG5, .dexcomG6, .GNSentry, .Droplet1, .blueReader, .watlaa:
             return true
             
-        case .miaomiao, .Bubble, .Blucon:
+        case .miaomiao, .Bubble, .Blucon, .Libre2, .Atom:
             return true
         
         
@@ -162,6 +174,12 @@ enum CGMTransmitterType:String, CaseIterable {
         case .watlaa:
             return ConstantsDefaultAlertLevels.defaultBatteryAlertLevelWatlaa
             
+        case .Libre2:
+            return ConstantsDefaultAlertLevels.defaultBatteryAlertLevelLibre2
+            
+        case .Atom:
+            return ConstantsDefaultAlertLevels.defaultBatteryAlertLevelAtom
+            
         }
     }
     
@@ -191,6 +209,12 @@ enum CGMTransmitterType:String, CaseIterable {
             return "%"
             
         case .watlaa:
+            return "%"
+            
+        case .Libre2:
+            return "%"
+            
+        case .Atom:
             return "%"
             
         }

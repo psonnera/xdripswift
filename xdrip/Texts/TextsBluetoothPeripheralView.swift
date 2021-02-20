@@ -40,6 +40,10 @@ class Texts_BluetoothPeripheralView {
         return NSLocalizedString("SensorSerialNumber", tableName: filename, bundle: Bundle.main, value: "Sensor Serial Number:", comment: "BluetoothPeripheral view, text of the cell with the sensor serial number")
     }()
     
+    static let sensorType: String = {
+        return NSLocalizedString("sensorType", tableName: filename, bundle: Bundle.main, value: "Sensor Type:", comment: "BluetoothPeripheral view, text of the cell with the sensor type (only used for Libre)")
+    }()
+    
     static let serialNumber: String = {
         return NSLocalizedString("serialNumber", tableName: filename, bundle: Bundle.main, value: "Serial Number:", comment: "BluetoothPeripheral view, text of the cell with the serial number (this is not the sensor serial number")
     }()
@@ -89,11 +93,11 @@ class Texts_BluetoothPeripheralView {
     }()
     
     static let resetRequired: String = {
-        return NSLocalizedString("resetRequired", tableName: filename, bundle: Bundle.main, value: "Reset Required", comment: "cell text, where user can select to reset a transmitter at next connect. Only for Dexcom")
+        return NSLocalizedString("resetRequired", tableName: filename, bundle: Bundle.main, value: "Reset Transmitter?", comment: "cell text, where user can select to reset a transmitter at next connect. Only for Dexcom")
     }()
     
     static let lastResetTimeStamp: String = {
-        return NSLocalizedString("lastReset", tableName: filename, bundle: Bundle.main, value: "Last Reset", comment: "cell text, shows when last reset was done, if known. Only for Dexcom")
+        return NSLocalizedString("lastReset", tableName: filename, bundle: Bundle.main, value: "Last Reset:", comment: "cell text, shows when last reset was done, if known. Only for Dexcom")
     }()
     
     static let lastResetTimeStampNotKnown: String = {
@@ -112,7 +116,4 @@ class Texts_BluetoothPeripheralView {
         return NSLocalizedString("cannotActiveCGMInFollowerMode", tableName: filename, bundle: Bundle.main, value: "You can not activate a CGM in follower mode", comment: "User tries to add a CGM or connect an already existing CGM, while in follower mode.")
     }()
     
-    static let cgmDeActivateBecauseMovingToFollowerMode: String = {
-        return NSLocalizedString("cgmDeActivateBecauseMovingToFollowerMode", tableName: filename, bundle: Bundle.main, value: "The CGM has been deactivated as you can not have an active CGM in follower mode", comment: "User switches from master to follower, whil e having a CGM active. This is text used in BluetoothPeripheralManager.swift.")
-    }()
 }

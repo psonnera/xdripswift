@@ -7,5 +7,5 @@ extension DexcomG4: BluetoothPeripheral {
         return .DexcomG4Type
         
     }
-    
+   
 }

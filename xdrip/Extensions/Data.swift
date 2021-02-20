@@ -79,22 +79,46 @@ extension Data {
         return number
     }
     
-    //source Data.Swift CGMBLEKit
-    func to<T: FixedWidthInteger>(_: T.Type) -> T {
-        return self.withUnsafeBytes { (bytes: UnsafePointer<T>) in
-            return T(littleEndian: bytes.pointee)
-        }
+    func to<T>(_: T.Type) -> T where T: ExpressibleByIntegerLiteral {
+        var value: T = 0
+        _ = Swift.withUnsafeMutableBytes(of: &value, { copyBytes(to: $0)} )
+        return value
     }
-
+    
     func toInt<T: FixedWidthInteger>() -> T {
         return to(T.self)
     }
     
     mutating func append<T: FixedWidthInteger>(_ newElement: T) {
-        var element = newElement.littleEndian
-        append(UnsafeBufferPointer(start: &element, count: 1))
+        
+        Swift.withUnsafeBytes(of: newElement.littleEndian) { self.append(contentsOf: $0) }
+        
     }
     
+    func getByteAt(position:Int) -> Int {
+        return Int(self[position])
+    }
+ 
+    // from DiaBLE
+    func hexDump(address: Int = -1, header: String = "") -> String {
+        var offset = startIndex
+        var offsetEnd = offset
+        var str = header.isEmpty ? "" : "\(header)\n"
+        while offset < endIndex {
+            _ = formIndex(&offsetEnd, offsetBy: 8, limitedBy: endIndex)
+            if address != -1 { str += String(format: "%04X", address + offset) + "  " }
+            str += "\(self[offset ..< offsetEnd].reduce("", { $0 + String(format: "%02X", $1) + " "}))"
+            str += String(repeating: "   ", count: 8 - distance(from: offset, to: offsetEnd))
+            str += "\(self[offset ..< offsetEnd].reduce(" ", { $0 + ((isprint(Int32($1)) != 0) ? String(Unicode.Scalar($1)) : "." ) }))\n"
+            _ = formIndex(&offset, offsetBy: 8, limitedBy: endIndex)
+        }
+        str.removeLast()
+        return str
+    }
+    
+    // from DiaBLE
+    var hexAddress: String { String(self.reduce("", { $0 + String(format: "%02X", $1) + ":"}).dropLast(1)) }
+
 }
 
 

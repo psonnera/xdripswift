@@ -1,6 +1,20 @@
 import Foundation
 
 extension UserDefaults {
+    
+    /// shared user defaults
+    private static let sharedUserDefaults = UserDefaults(suiteName: Bundle.main.appGroupSuiteName)
+    
+    /// common function to be called if user default needs to be stored in shared user defaults
+    public static func storeInSharedUserDefaults(value: Any, forKey key: String) {
+        
+        // setting to be stored also in shared userdefaults because it's used by the today widget
+        if let sharedUserDefaults = sharedUserDefaults {
+            sharedUserDefaults.set(value, forKey: key)
+        }
+        
+    }
+
     /// keys for settings and user defaults. For reading and writing settings, the keys should not be used, the specific functions kan be used.
     public enum Key: String {
         // User configurable Settings
@@ -9,11 +23,7 @@ extension UserDefaults {
         
         /// bloodglucose  unit
         case bloodGlucoseUnitIsMgDl = "bloodGlucoseUnit"
-        /// low value
-        case lowMarkValue = "lowMarkValue"
-        /// high value
-        case highMarkValue = "highMarkValue"
-        /// master or follower
+        /// urgent high value
         case isMaster = "isMaster"
         /// should notification be shown with reading yes or no
         case showReadingInNotification = "showReadingInNotification"
@@ -21,6 +31,23 @@ extension UserDefaults {
         case showReadingInAppBadge = "showReadingInAppBadge"
         /// should reading by multiplied by 10
         case multipleAppBadgeValueWith10 = "multipleAppBadgeValueWith10"
+        
+        // Home Screen and graph settings
+        
+        /// show the objectives and make them display on the graph? Or just hide it all because it's too complicated to waste time with?
+        case useObjectives = "useObjectives"
+        /// show the objective lines in color or grey?
+        case urgentHighMarkValue = "urgentHighMarkValue"
+        /// high value
+        case highMarkValue = "highMarkValue"
+        /// low value
+        case lowMarkValue = "lowMarkValue"
+        /// urgent low value
+        case urgentLowMarkValue = "urgentLowMarkValue"
+        /// show the target line or hide it?
+        case showTarget = "showTarget"
+        /// target value
+        case targetMarkValue = "targetMarkValue"
         
         // Transmitter
         
@@ -42,6 +69,8 @@ extension UserDefaults {
         case nightScoutAPIKey = "nightScoutAPIKey"
         /// send sensor start time to nightscout ?
         case uploadSensorStartTimeToNS = "uploadSensorStartTimeToNS"
+        /// port number to use, 0 means not set
+        case nightScoutPort = "nightScoutPort"
         
         // Dexcom Share
         
@@ -146,9 +175,15 @@ extension UserDefaults {
         /// timestamp lastest reading uploaded to NightScout
         case timeStampLatestNSUploadedBgReadingToNightScout = "timeStampLatestUploadedBgReading"
         
+        /// timestamp latest calibration uploaded to NightScout
+        case timeStampLatestNSUploadedCalibrationToNightScout = "timeStampLatestUploadedCalibration"
+        
         // Transmitter
         /// Transmitter Battery Level
         case transmitterBatteryInfo = "transmitterbatteryinfo"
+        
+        /// timestamp last battery reading (will only be used for dexcom G5 where we need to explicitly ask for the battery)
+        case timeStampOfLastBatteryReading = "timeStampOfLastBatteryReading"
         
         // HealthKit
         /// did user authorize the storage of readings in healthkit or not
@@ -161,6 +196,21 @@ extension UserDefaults {
         /// timestamp of latest reading uploaded to Dexcom Share
         case timeStampLatestDexcomShareUploadedBgReading = "timeStampLatestDexcomShareUploadedBgReading"
         
+        // Loop
+        /// dictionary representation of readings that were shared  with Loop. This is not the json representation, it's an array of dictionary
+        case readingsStoredInSharedUserDefaultsAsDictionary = "readingsStoredInSharedUserDefaultsAsDictionary"
+            
+        /// timestamp lastest reading shared with Loop
+        case timeStampLatestLoopSharedBgReading = "timeStampLatestLoopSharedBgReading"
+            
+        // Trace
+        /// should debug level logs be added in trace file or not, and also in NSLog
+        case addDebugLevelLogsInTraceFileAndNSLog = "addDebugLevelLogsInTraceFileAndNSLog"
+        
+        // non fixed slope values for oop web Libre
+        /// web oop parameters, only for bubble, miaomiao and Libre 2
+        case libre1DerivedAlgorithmParameters = "algorithmParameters"
+
         // development settings
         
         /// G6 factor1 - for testing G6 scaling
@@ -171,12 +221,44 @@ extension UserDefaults {
         
         /// NSLog enabled or not
         case NSLogEnabled = "NSLogEnabled"
-        
+                
         /// OSLogEnabled enabled or not
         case OSLogEnabled = "OSLogEnabled"
         
+        /// case smooth libre values
+        case smoothLibreValues = "smoothLibreValues"
+        
+        /// used for Libre data parsing - only for Libre 1 or Libre 2 read via transmitter, ie full NFC block
+        case previousRawLibreValues = "previousRawLibreValues"
+        
+        /// used for storing data read with Libre 2 direct
+        case previousRawGlucoseValues = "previousRawGlucoseValues"
+        
+        /// used for storing data read with Libre 2 direct
+        case previousRawTemperatureValues = "previousRawTemperatureValues"
+        
+        /// used for storing data read with Libre 2 direct
+        case previousTemperatureAdjustmentValues = "previousTemperatureAdjustmentValues"
+        
         /// to merge from 3.x to 4.x, can be deleted once 3.x is not used anymore
         case cgmTransmitterDeviceAddress = "cgmTransmitterDeviceAddress"
+        
+        
+        // Libre
+        /// Libre unlock code
+        case libreActiveSensorUnlockCode = "activeSensorUnlockCode"
+        
+        /// Libre Unlock count
+        case libreActiveSensorUnlockCount = "activeSensorUnlockCount"
+        
+        /// - Libre sensor id - used in Libre 2 setup
+        /// - stored as data as read from transmitter
+        case libreSensorUID = "libreSensorUID"
+        
+        
+        /// - Libre patch info - used in Libre 2 setup - should be read first eg via bubble or mm and then used in Libre 2 communication
+        /// - stored as data as read from transmitter
+        case librePatchInfo = "librePatchInfo"
         
     }
     
@@ -192,46 +274,10 @@ extension UserDefaults {
         }
         set {
             set(!newValue, forKey: Key.bloodGlucoseUnitIsMgDl.rawValue)
-        }
-    }
-    
-    /// the lowmarkvalue in unit selected by user ie, mgdl or mmol
-    @objc dynamic var lowMarkValueInUserChosenUnit:Double {
-        get {
-            //read currentvalue in mgdl
-            var returnValue = double(forKey: Key.lowMarkValue.rawValue)
-            // if 0 set to defaultvalue
-            if returnValue == 0.0 {
-                returnValue = ConstantsBGGraphBuilder.defaultLowMarkInMgdl
-            }
-            if !bloodGlucoseUnitIsMgDl {
-                returnValue = returnValue.mgdlToMmol()
-            }
-            return returnValue
-        }
-        set {
-            // store in mgdl
-            set(bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.lowMarkValue.rawValue)
-        }
-    }
-    
-    /// the highmarkvalue in unit selected by user ie, mgdl or mmol
-    @objc dynamic var highMarkValueInUserChosenUnit:Double {
-        get {
-            //read currentvalue in mgdl
-            var returnValue = double(forKey: Key.highMarkValue.rawValue)
-            // if 0 set to defaultvalue
-            if returnValue == 0.0 {
-                returnValue = ConstantsBGGraphBuilder.defaultHighMmarkInMgdl
-            }
-            if !bloodGlucoseUnitIsMgDl {
-                returnValue = returnValue.mgdlToMmol()
-            }
-            return returnValue
-        }
-        set {
-            // store in mgdl
-            set(bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.highMarkValue.rawValue)
+
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            UserDefaults.storeInSharedUserDefaults(value: !newValue, forKey: Key.bloodGlucoseUnitIsMgDl.rawValue)
+            
         }
     }
     
@@ -243,34 +289,6 @@ extension UserDefaults {
         }
         set {
             set(!newValue, forKey: Key.isMaster.rawValue)
-        }
-    }
-    
-    /// the highmarkvalue in unit selected by user ie, mgdl or mmol - rounded
-    @objc dynamic var highMarkValueInUserChosenUnitRounded:String {
-        get {
-            return highMarkValueInUserChosenUnit.bgValuetoString(mgdl: bloodGlucoseUnitIsMgDl)
-        }
-        set {
-            var value = newValue.toDouble()
-            if !bloodGlucoseUnitIsMgDl {
-                value = value?.mmolToMgdl()
-            }
-            set(value, forKey: Key.highMarkValue.rawValue)
-        }
-    }
-
-    /// the lowmarkvalue in unit selected by user ie, mgdl or mmol - rounded
-    @objc dynamic var lowMarkValueInUserChosenUnitRounded:String {
-        get {
-            return lowMarkValueInUserChosenUnit.bgValuetoString(mgdl: bloodGlucoseUnitIsMgDl)
-        }
-        set {
-            var value = newValue.toDouble()
-            if !bloodGlucoseUnitIsMgDl {
-                value = value?.mmolToMgdl()
-            }
-            set(value, forKey: Key.lowMarkValue.rawValue)
         }
     }
     
@@ -306,7 +324,287 @@ extension UserDefaults {
             set(!newValue, forKey: Key.multipleAppBadgeValueWith10.rawValue)
         }
     }
+    
+    // MARK: Home Screen Settings
+    
+    /// the urgenthighmarkvalue in unit selected by user ie, mgdl or mmol
+    @objc dynamic var urgentHighMarkValueInUserChosenUnit:Double {
+        get {
+            //read currentvalue in mgdl
+            var returnValue = double(forKey: Key.urgentHighMarkValue.rawValue)
+            // if 0 set to defaultvalue
+            if returnValue == 0.0 {
+                returnValue = ConstantsBGGraphBuilder.defaultUrgentHighMarkInMgdl
+            }
+            if !bloodGlucoseUnitIsMgDl {
+                returnValue = returnValue.mgdlToMmol()
+            }
+            return returnValue
+        }
+        set {
+            // store in mgdl
+            set(bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.urgentHighMarkValue.rawValue)
+            
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            UserDefaults.storeInSharedUserDefaults(value: bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.urgentHighMarkValue.rawValue)
 
+        }
+    }
+    
+    /// the highmarkvalue in unit selected by user ie, mgdl or mmol
+    @objc dynamic var highMarkValueInUserChosenUnit:Double {
+        get {
+            //read currentvalue in mgdl
+            var returnValue = double(forKey: Key.highMarkValue.rawValue)
+            // if 0 set to defaultvalue
+            if returnValue == 0.0 {
+                returnValue = ConstantsBGGraphBuilder.defaultHighMarkInMgdl
+            }
+            if !bloodGlucoseUnitIsMgDl {
+                returnValue = returnValue.mgdlToMmol()
+            }
+            return returnValue
+        }
+        set {
+            // store in mgdl
+            set(bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.highMarkValue.rawValue)
+            
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            UserDefaults.storeInSharedUserDefaults(value: bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.highMarkValue.rawValue)
+
+        }
+    }
+    
+    /// the highMarkValue in mgdl
+    @objc dynamic var highMarkValue: Double {
+        get {
+            
+            //read currentvalue in mgdl
+            return double(forKey: Key.highMarkValue.rawValue)
+            
+        }
+        
+    }
+
+    
+    /// the targetvalue in unit selected by user ie, mgdl or mmol
+    @objc dynamic var targetMarkValueInUserChosenUnit:Double {
+        get {
+            //read currentvalue in mgdl
+            var returnValue = double(forKey: Key.targetMarkValue.rawValue)
+            // if 0 set to defaultvalue
+            if returnValue == 0.0 {
+                returnValue = ConstantsBGGraphBuilder.defaultTargetMarkInMgdl
+            }
+            if !bloodGlucoseUnitIsMgDl {
+                returnValue = returnValue.mgdlToMmol()
+            }
+            return returnValue
+        }
+        set {
+            // store in mgdl
+            set(bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.targetMarkValue.rawValue)
+        }
+    }
+    
+    /// the lowmarkvalue in unit selected by user ie, mgdl or mmol
+    @objc dynamic var lowMarkValueInUserChosenUnit:Double {
+        get {
+            //read currentvalue in mgdl
+            var returnValue = double(forKey: Key.lowMarkValue.rawValue)
+            // if 0 set to defaultvalue
+            if returnValue == 0.0 {
+                returnValue = ConstantsBGGraphBuilder.defaultLowMarkInMgdl
+            }
+            if !bloodGlucoseUnitIsMgDl {
+                returnValue = returnValue.mgdlToMmol()
+            }
+            return returnValue
+        }
+        set {
+            // store in mgdl
+            set(bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.lowMarkValue.rawValue)
+            
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            UserDefaults.storeInSharedUserDefaults(value: bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.lowMarkValue.rawValue)
+
+        }
+    }
+    
+    /// the lowmarkvalue in mgdl
+    @objc dynamic var lowMarkValue: Double {
+        get {
+            
+            //read currentvalue in mgdl
+            return double(forKey: Key.lowMarkValue.rawValue)
+            
+        }
+        
+    }
+    
+    /// the urgentlowmarkvalue in unit selected by user ie, mgdl or mmol
+    @objc dynamic var urgentLowMarkValueInUserChosenUnit:Double {
+        get {
+            //read currentvalue in mgdl
+            var returnValue = double(forKey: Key.urgentLowMarkValue.rawValue)
+            // if 0 set to defaultvalue
+            if returnValue == 0.0 {
+                returnValue = ConstantsBGGraphBuilder.defaultUrgentLowMarkInMgdl
+            }
+            if !bloodGlucoseUnitIsMgDl {
+                returnValue = returnValue.mgdlToMmol()
+            }
+            return returnValue
+        }
+        set {
+            // store in mgdl
+            set(bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.urgentLowMarkValue.rawValue)
+            
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            UserDefaults.storeInSharedUserDefaults(value: bloodGlucoseUnitIsMgDl ? newValue:newValue.mmolToMgdl(), forKey: Key.urgentLowMarkValue.rawValue)
+
+        }
+    }
+ 
+    /// the urgentLowMarkValue in mgdl
+    @objc dynamic var urgentLowMarkValue: Double {
+        get {
+            
+            //read currentvalue in mgdl
+            return double(forKey: Key.urgentLowMarkValue.rawValue)
+            
+        }
+        
+    }
+
+    /// the urgenthighmarkvalue in unit selected by user ie, mgdl or mmol - rounded
+    @objc dynamic var urgentHighMarkValueInUserChosenUnitRounded:String {
+        get {
+            return urgentHighMarkValueInUserChosenUnit.bgValuetoString(mgdl: bloodGlucoseUnitIsMgDl)
+        }
+        set {
+            var value = newValue.toDouble()
+            if !bloodGlucoseUnitIsMgDl {
+                value = value?.mmolToMgdl()
+            }
+            set(value, forKey: Key.urgentHighMarkValue.rawValue)
+            
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            if let value = value {
+                UserDefaults.storeInSharedUserDefaults(value: value, forKey: Key.urgentHighMarkValue.rawValue)
+            }
+
+        }
+    }
+    
+    /// the urgentHighMarkValue in mgdl
+    @objc dynamic var urgentHighMarkValue: Double {
+        get {
+            
+            //read currentvalue in mgdl
+            return double(forKey: Key.urgentHighMarkValue.rawValue)
+            
+        }
+        
+    }
+
+    /// the highmarkvalue in unit selected by user ie, mgdl or mmol - rounded
+    @objc dynamic var highMarkValueInUserChosenUnitRounded:String {
+        get {
+            return highMarkValueInUserChosenUnit.bgValuetoString(mgdl: bloodGlucoseUnitIsMgDl)
+        }
+        set {
+            var value = newValue.toDouble()
+            if !bloodGlucoseUnitIsMgDl {
+                value = value?.mmolToMgdl()
+            }
+            set(value, forKey: Key.highMarkValue.rawValue)
+
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            if let value = value {
+                UserDefaults.storeInSharedUserDefaults(value: value, forKey: Key.highMarkValue.rawValue)
+            }
+
+        }
+    }
+    
+    /// the targetmarkvalue in unit selected by user ie, mgdl or mmol - rounded
+    @objc dynamic var targetMarkValueInUserChosenUnitRounded:String {
+        get {
+            return targetMarkValueInUserChosenUnit.bgValuetoString(mgdl: bloodGlucoseUnitIsMgDl)
+        }
+        set {
+            var value = newValue.toDouble()
+            if !bloodGlucoseUnitIsMgDl {
+                value = value?.mmolToMgdl()
+            }
+            set(value, forKey: Key.targetMarkValue.rawValue)
+        }
+    }
+    
+    /// the lowmarkvalue in unit selected by user ie, mgdl or mmol - rounded
+    @objc dynamic var lowMarkValueInUserChosenUnitRounded:String {
+        get {
+            return lowMarkValueInUserChosenUnit.bgValuetoString(mgdl: bloodGlucoseUnitIsMgDl)
+        }
+        set {
+            var value = newValue.toDouble()
+            if !bloodGlucoseUnitIsMgDl {
+                value = value?.mmolToMgdl()
+            }
+            set(value, forKey: Key.lowMarkValue.rawValue)
+            
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            if let value = value {
+                UserDefaults.storeInSharedUserDefaults(value: value, forKey: Key.lowMarkValue.rawValue)
+            }
+
+        }
+    }
+    
+    /// the urgentlowmarkvalue in unit selected by user ie, mgdl or mmol - rounded
+    @objc dynamic var urgentLowMarkValueInUserChosenUnitRounded:String {
+        get {
+            return urgentLowMarkValueInUserChosenUnit.bgValuetoString(mgdl: bloodGlucoseUnitIsMgDl)
+        }
+        set {
+            var value = newValue.toDouble()
+            if !bloodGlucoseUnitIsMgDl {
+                value = value?.mmolToMgdl()
+            }
+            set(value, forKey: Key.urgentLowMarkValue.rawValue)
+            
+            // setting to be stored also in shared userdefaults because it's used by the today widget
+            if let value = value {
+                UserDefaults.storeInSharedUserDefaults(value: value, forKey: Key.urgentLowMarkValue.rawValue)
+            }
+
+        }
+    }
+    
+    /// should we use objectives for the BG values and graph lines etc?
+    @objc dynamic var useObjectives: Bool {
+        // default value for bool in userdefaults is false, by default we want the objective-based graph to be disabled so as not to scare anybody. They can enable it when they have time to understand it.
+        get {
+            return !bool(forKey: Key.useObjectives.rawValue)
+        }
+        set {
+            set(!newValue, forKey: Key.useObjectives.rawValue)
+        }
+    }
+    
+    /// should the target line (always shown in green) be shown on the graph?
+    @objc dynamic var showTarget: Bool {
+        // default value for bool in userdefaults is false, by default we will hide the target line as it could confuse users
+        get {
+            return !bool(forKey: Key.showTarget.rawValue)
+        }
+        set {
+            set(!newValue, forKey: Key.showTarget.rawValue)
+        }
+    }
+    
+    
     // MARK: Transmitter Settings
     
     /// cgm ransmittertype currently active
@@ -363,6 +661,16 @@ extension UserDefaults {
         }
         set {
             set(newValue, forKey: Key.uploadSensorStartTimeToNS.rawValue)
+        }
+    }
+    
+    /// Nightscout port number, 0 means not set
+    @objc dynamic var nightScoutPort: Int {
+        get {
+            return integer(forKey: Key.nightScoutPort.rawValue)
+        }
+        set {
+            set(newValue, forKey: Key.nightScoutPort.rawValue)
         }
     }
 
@@ -734,6 +1042,16 @@ extension UserDefaults {
         }
     }
     
+    /// timestamp latest calibration uploaded to NightScout
+    var timeStampLatestNightScoutUploadedCalibration:Date? {
+        get {
+            return object(forKey: Key.timeStampLatestNSUploadedCalibrationToNightScout.rawValue) as? Date
+        }
+        set {
+            set(newValue, forKey: Key.timeStampLatestNSUploadedCalibrationToNightScout.rawValue)
+        }
+    }
+    
     /// transmitterBatteryInfo, this should be the transmitter battery info of the latest active cgmTransmitter
     var transmitterBatteryInfo:TransmitterBatteryInfo? {
         get {
@@ -750,6 +1068,17 @@ extension UserDefaults {
             } else {
                 set(nil, forKey: Key.transmitterBatteryInfo.rawValue)
             }
+            timeStampOfLastBatteryReading = Date()
+        }
+    }
+    
+    /// timestamp latest calibration uploaded to NightScout
+    var timeStampOfLastBatteryReading:Date? {
+        get {
+            return object(forKey: Key.timeStampOfLastBatteryReading.rawValue) as? Date
+        }
+        set {
+            set(newValue, forKey: Key.timeStampOfLastBatteryReading.rawValue)
         }
     }
     
@@ -780,6 +1109,28 @@ extension UserDefaults {
         }
         set {
             set(newValue, forKey: Key.timeStampLatestDexcomShareUploadedBgReading.rawValue)
+        }
+    }
+    
+    // MARK: - =====  Loop Share Settings ======
+    
+    /// dictionary representation of readings that were shared  with Loop. This is not the json representation, it's an array of dictionary
+    var readingsStoredInSharedUserDefaultsAsDictionary: [Dictionary<String, Any>]? {
+        get {
+            return object(forKey: Key.readingsStoredInSharedUserDefaultsAsDictionary.rawValue) as? [Dictionary<String, Any>]
+        }
+        set {
+            set(newValue, forKey: Key.readingsStoredInSharedUserDefaultsAsDictionary.rawValue)
+        }
+    }
+
+    /// timestamp lastest reading uploaded to NightScout
+    var timeStampLatestLoopSharedBgReading:Date? {
+        get {
+            return object(forKey: Key.timeStampLatestLoopSharedBgReading.rawValue) as? Date
+        }
+        set {
+            set(newValue, forKey: Key.timeStampLatestLoopSharedBgReading.rawValue)
         }
     }
     
@@ -815,6 +1166,76 @@ extension UserDefaults {
         }
     }
     
+    /// smoothLibreValues - default false
+    var smoothLibreValues: Bool {
+        get {
+            return bool(forKey: Key.smoothLibreValues.rawValue)
+        }
+        set {
+            set(newValue, forKey: Key.smoothLibreValues.rawValue)
+        }
+    }
+    
+    /// used for Libre data parsing - for processing in LibreDataParser which is only in case of reading with NFC (ie bubble etc)
+    var previousRawLibreValues: [Double] {
+        get {
+            if let data = object(forKey: Key.previousRawLibreValues.rawValue) as? [Double] {
+                return data as [Double]
+            } else {
+                return [Double]()
+            }
+            
+        }
+        set {
+            set(newValue, forKey: Key.previousRawLibreValues.rawValue)
+        }
+    }
+    
+    /// used for storing data read with Libre 2 direct
+    var previousRawGlucoseValues: [Int]? {
+        get {
+            if let data = object(forKey: Key.previousRawGlucoseValues.rawValue) as? [Int] {
+                return data as [Int]
+            } else {
+                return nil
+            }
+            
+        }
+        set {
+            set(newValue, forKey: Key.previousRawGlucoseValues.rawValue)
+        }
+    }
+    
+    /// used for storing data read with Libre 2 direct
+    var previousRawTemperatureValues: [Int]? {
+        get {
+            if let data = object(forKey: Key.previousRawTemperatureValues.rawValue) as? [Int] {
+                return data as [Int]
+            } else {
+                return nil
+            }
+            
+        }
+        set {
+            set(newValue, forKey: Key.previousRawTemperatureValues.rawValue)
+        }
+    }
+    
+    /// used for storing data read with Libre 2 direct
+    var previousTemperatureAdjustmentValues: [Int]? {
+        get {
+            if let data = object(forKey: Key.previousTemperatureAdjustmentValues.rawValue) as? [Int] {
+                return data as [Int]
+            } else {
+                return nil
+            }
+            
+        }
+        set {
+            set(newValue, forKey: Key.previousTemperatureAdjustmentValues.rawValue)
+        }
+    }
+    
     /// OSLogEnabled - default false
     var OSLogEnabled: Bool {
         get {
@@ -825,6 +1246,16 @@ extension UserDefaults {
         }
     }
     
+    /// addDebugLevelLogsInTraceFileAndNSLog - default false
+    var addDebugLevelLogsInTraceFileAndNSLog: Bool {
+        get {
+            return bool(forKey: Key.addDebugLevelLogsInTraceFileAndNSLog.rawValue)
+        }
+        set {
+            set(newValue, forKey: Key.addDebugLevelLogsInTraceFileAndNSLog.rawValue)
+        }
+    }
+    
     /// to merge from 3.x to 4.x, can be deleted once 3.x is not used anymore
     var cgmTransmitterDeviceAddress: String? {
         get {
@@ -832,6 +1263,78 @@ extension UserDefaults {
         }
         set {
             set(newValue, forKey: Key.cgmTransmitterDeviceAddress.rawValue)
+        }
+    }
+    
+    /// web oop parameters, only for bubble, miaomiao and Libre 2
+    var libre1DerivedAlgorithmParameters: Libre1DerivedAlgorithmParameters? {
+        get {
+            guard let jsonString = string(forKey: Key.libre1DerivedAlgorithmParameters.rawValue) else { return nil }
+            guard let jsonData = jsonString.data(using: .utf8) else { return nil }
+            guard let value = try? JSONDecoder().decode(Libre1DerivedAlgorithmParameters.self, from: jsonData) else { return nil }
+            return value
+        }
+        set {
+            let encoder = JSONEncoder()
+            guard let jsonData = try? encoder.encode(newValue) else { return }
+            let jsonString = String(bytes: jsonData, encoding: .utf8)
+            set(jsonString, forKey: Key.libre1DerivedAlgorithmParameters.rawValue)
+        }
+    }
+    
+    /// Libre Unlock code
+    var libreActiveSensorUnlockCode: UInt32 {
+        get {
+            
+            let value = UInt32(integer(forKey: Key.libreActiveSensorUnlockCode.rawValue))
+            
+            if value == 0 {
+                return 42
+            }
+            
+            return UInt32(integer(forKey: Key.libreActiveSensorUnlockCode.rawValue))
+            
+        }
+        set {
+            set(newValue, forKey: Key.libreActiveSensorUnlockCode.rawValue)
+        }
+    }
+
+    /// Libre Unlock count
+    var libreActiveSensorUnlockCount: UInt16 {
+        get {
+            return UInt16(integer(forKey: Key.libreActiveSensorUnlockCount.rawValue))
+        }
+        set {
+            set(newValue, forKey: Key.libreActiveSensorUnlockCount.rawValue)
+        }
+    }
+    
+    /// Libre sensor id
+    var libreSensorUID: Data? {
+        get {
+            if let data = object(forKey: Key.libreSensorUID.rawValue) as? Data {
+                return data
+            } else {
+                return nil
+            }
+        }
+        set {
+            set(newValue, forKey: Key.libreSensorUID.rawValue)
+        }
+    }
+    
+    /// Libre librePatchInfo
+    var librePatchInfo: Data? {
+        get {
+            if let data = object(forKey: Key.librePatchInfo.rawValue) as? Data {
+                return data
+            } else {
+                return nil
+            }
+        }
+        set {
+            set(newValue, forKey: Key.librePatchInfo.rawValue)
         }
     }
     

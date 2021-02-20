@@ -8,6 +8,7 @@
 "confirmDeletionPeripheral" = "Do you want to delete bluetooth device: ";
 "bluetoothPeripheralAlias" = "Alias:";
 "SensorSerialNumber" = "Sensor Serial Number:";
+"sensorType" = "Sensor Type:";
 "serialNumber" = "Serial Number:";
 "battery" = "Battery:";
 "needsTransmitterId" = "Missing Transmitter ID";
@@ -20,10 +21,9 @@
 "connect" = "Connect";
 "connectedAt" = "Connected At:";
 "disConnectedAt" = "Disconnected At:";
-"resetRequired" = "Reset Required";
+"resetRequired" = "Reset Transmitter?";
 "lastReset" = "Last Reset:";
 "lastResetNotKnown" = "Last Reset Timestamp is not known";
 "transmitterResultResult" = "Transmitter Reset Result";
 "bootLoader" = "Bootloader";
 "cannotActiveCGMInFollowerMode" = "You can not activate a CGM in Follower Mode";
-"cgmDeActivateBecauseMovingToFollowerMode" = "The CGM has been deactivated as you can not have an active CGM in Follower Mode";

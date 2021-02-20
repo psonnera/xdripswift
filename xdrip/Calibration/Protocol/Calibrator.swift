@@ -2,8 +2,12 @@ import Foundation
 import CoreData
 
 protocol Calibrator {
+    
     ///slope parameters to be defined per type of sensor Dexcom/Libre, in class that conforms to Calibrator protocol
     var sParams:SlopeParameters{get}
+    
+    /// for instance Dexcom values come in 100.000's, (eg rawvalue 140.000), in case of Dexcom divider is 1000, resulting in 140, then this value will be used in calibration algorithm.
+    var rawValueDivider:Double {get}
 
     /// false for Libre, true for Dexcom
     var ageAdjustMentNeeded:Bool{get}
@@ -23,7 +27,6 @@ protocol Calibrator {
     /// create a new BgReading
     /// - parameters:
     ///     - rawData : the rawdata value
-    ///     - filteredData : the filtered data
     ///     - timeStamp : optional, if nil then actualy date and time is used
     ///     - sensor : actual sensor, optional
     ///     - last3Readings : result of call to BgReadings.getLatestBgReadings(3, sensor) sensor the current sensor and ignore calculatedValue and ignoreRawData both set to false - inout parameter to improve performance and also because it's an NSManagedObject
@@ -33,7 +36,7 @@ protocol Calibrator {
     ///     - lastCalibration : result of call to Calibrations.lastCalibrationForActiveSensor
     /// - returns:
     ///     - the created bgreading
-    func createNewBgReading(rawData:Double, filteredData:Double, timeStamp:Date?, sensor:Sensor?, last3Readings:inout Array<BgReading>, lastCalibrationsForActiveSensorInLastXDays:inout Array<Calibration>, firstCalibration:Calibration?, lastCalibration:Calibration?, deviceName:String?,  nsManagedObjectContext:NSManagedObjectContext ) -> BgReading
+    func createNewBgReading(rawData:Double, timeStamp:Date?, sensor:Sensor?, last3Readings:inout Array<BgReading>, lastCalibrationsForActiveSensorInLastXDays:inout Array<Calibration>, firstCalibration:Calibration?, lastCalibration:Calibration?, deviceName:String?,  nsManagedObjectContext:NSManagedObjectContext ) -> BgReading
     
     /// creates a calibration, stored in the database, but context not saved. Also readings will be adpated, also not saved.
     /// - parameters:
@@ -42,6 +45,9 @@ protocol Calibrator {
     ///     - lastCalibrationsForActiveSensorInLastXDays: ... the latest calibrations in x days, in Spike/xdripplus it's 4. Order by timestamp, large to small, ie the first is the youngest
     ///     - firstCalibration: the very first calibration for the sensor
     func createNewCalibration(bgValue:Double, lastBgReading:BgReading, sensor:Sensor, lastCalibrationsForActiveSensorInLastXDays:inout Array<Calibration>, firstCalibration:Calibration,deviceName:String?, nsManagedObjectContext:NSManagedObjectContext) -> Calibration
+    
+    /// gives a description
+    func description() -> String
 }
 
 extension Calibrator {
@@ -111,7 +117,6 @@ extension Calibrator {
     ///
     /// - parameters:
     ///     - rawData : the rawdata value
-    ///     - filteredData : the filtered data
     ///     - timeStamp : optional, if nil then actualy date and time is used
     ///     - sensor : actual sensor, optional
     ///     - last3Readings : result of call to BgReadings.getLatestBgReadings(3, sensor) sensor the current sensor and ignore calculatedValue and ignoreRawData both set to false - inout parameter to improve performance and also because it's an NSManagedObject
@@ -121,7 +126,7 @@ extension Calibrator {
     ///     - lastCalibration : result of call to Calibrations.lastCalibrationForActiveSensor
     /// - returns:
     ///     - the created bgreading
-    func createNewBgReading(rawData:Double, filteredData:Double, timeStamp:Date?, sensor:Sensor?, last3Readings:inout Array<BgReading>, lastCalibrationsForActiveSensorInLastXDays:inout Array<Calibration>, firstCalibration:Calibration?, lastCalibration:Calibration?, deviceName:String?, nsManagedObjectContext:NSManagedObjectContext ) -> BgReading {
+    func createNewBgReading(rawData:Double, timeStamp:Date?, sensor:Sensor?, last3Readings:inout Array<BgReading>, lastCalibrationsForActiveSensorInLastXDays:inout Array<Calibration>, firstCalibration:Calibration?, lastCalibration:Calibration?, deviceName:String?, nsManagedObjectContext:NSManagedObjectContext ) -> BgReading {
         
         var timeStampToUse:Date = Date()
         if let timeStamp = timeStamp {
@@ -132,8 +137,7 @@ extension Calibrator {
             timeStamp:timeStampToUse,
             sensor:sensor,
             calibration:lastCalibration,
-            rawData:rawData / 1000,
-            filteredData:filteredData / 1000,
+            rawData:rawData / rawValueDivider,
             deviceName:deviceName,
             nsManagedObjectContext:nsManagedObjectContext
         )
@@ -149,7 +153,7 @@ extension Calibrator {
                     }
                 }
                 bgReading.calculatedValue = ((lastCalibration.slope * bgReading.ageAdjustedRawValue) + lastCalibration.intercept)
-                bgReading.filteredCalculatedValue = ((lastCalibration.slope * ageAdjustedFiltered(bgReading: bgReading)) + lastCalibration.intercept)
+
             }
             updateCalculatedValue(for: bgReading)
         }
@@ -534,23 +538,6 @@ extension Calibrator {
         let relativeIntercept:Double = rawA - (relativeSlope * timeA.toMillisecondsAsDouble())
         
         return ((relativeSlope * calibrationTime.toMillisecondsAsDouble()) + relativeIntercept)
-    }
-    
-    /// taken from xdripplus
-    ///
-    /// - parameters:
-    ///     - bgReading : bgreading for which usedRaw will be calculated
-    /// - returns:
-    ///     -   ageAdjustedFiltered
-    private func ageAdjustedFiltered(bgReading:BgReading) -> Double {
-        let usedRaw = bgReading.ageAdjustedRawValue
-        
-        if(usedRaw == bgReading.rawData || bgReading.rawData == 0) {
-            return bgReading.filteredData
-        } else {
-            // adjust the filtereddata the same factor as the age adjusted raw value
-            return bgReading.filteredData * usedRaw / bgReading.rawData;
-        }
     }
     
     /// calls findNewCurve, findNewRawCurve and findSlope for bgReading

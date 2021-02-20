@@ -596,12 +596,6 @@ extension M5StackBluetoothPeripheralViewModel: BluetoothPeripheralViewModel {
         return M5StackSections(rawValue: section)?.sectionTitle() ?? ""
     }
     
-    /// - parameters :
-    ///    - bluetoothTransmitterDelegate : usually the uiViewController
-    ///    - bluetoothPeripheral : if nil then the viewcontroller is opened to scan for a new peripheral
-    ///    - bluetoothPeripheralManager : reference to bluetoothPeripheralManaging object
-    ///    - tableView : needed to initiate refresh of row
-    ///    - bluetoothPeripheralViewController : BluetoothPeripheralViewController
     func configure(bluetoothPeripheral: BluetoothPeripheral?, bluetoothPeripheralManager: BluetoothPeripheralManaging, tableView: UITableView,  bluetoothPeripheralViewController: BluetoothPeripheralViewController) {
         
         self.bluetoothPeripheralManager = bluetoothPeripheralManager

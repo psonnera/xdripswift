@@ -8,15 +8,22 @@
 
 import Foundation
 
-struct LibreSensorSerialNumber: CustomStringConvertible {
+public struct LibreSensorSerialNumber: CustomStringConvertible {
     
     let uid: Data
+    
+    let libreSensorType: LibreSensorType?
 
     fileprivate let lookupTable = ["0","1","2","3","4","5","6","7","8","9","A","C","D","E","F","G","H","J","K","L","M","N","P","Q","R","T","U","V","W","X","Y","Z"]
     
-    init?(withUID uid: Data) {
+    init?(withUID uid: Data, with libreSensorType: LibreSensorType?) {
+        
         guard uid.count == 8 else {return nil}
+        
         self.uid = uid
+        
+        self.libreSensorType = libreSensorType
+        
     }
 
     // MARK: - computed properties
@@ -87,9 +94,37 @@ struct LibreSensorSerialNumber: CustomStringConvertible {
         fiveBitsArray.append( bytes[5] >> 3 )
         fiveBitsArray.append( bytes[5] << 2 )
 
-        let serialNumber = fiveBitsArray.reduce("0", { // prepend with "0" according to step 3.)
+        var first = "0"
+        
+        if let libreSensorType = libreSensorType {
+            
+            switch libreSensorType {
+            
+            case .libreProH:
+                
+                first = "1"
+                
+            case .libre2:
+            
+                first = "3"
+                
+            case .libre1, .libreUS:
+                
+                first = "0"
+                
+                
+            default:
+                
+                first = "0"
+                
+            }
+            
+        }
+        
+        let serialNumber = fiveBitsArray.reduce(first, { // prepend with "0" according to step 3.)
             $0 + lookupTable[ Int(0x1F & $1) ]  // Mask with 0x1F to only take the five relevant bits
         })
+        
         return serialNumber
     }
     
@@ -102,8 +137,10 @@ struct LibreSensorSerialNumber: CustomStringConvertible {
         return stringArray.dropFirst().reduce(stringArray.first!,  {$0 + ":" + $1} )
     }
 
-    // MARK: - CustomStringConvertible Protocoll
-    var description: String {
+    // MARK: - CustomStringConvertible Protocol
+    
+    public var description: String {
         return "Uid is \(prettyUidString) and derived serial number is \(serialNumber)"
     }
+    
 }

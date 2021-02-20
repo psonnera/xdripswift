@@ -26,8 +26,11 @@ final class SettingsViewController: UIViewController {
     
     private enum Section: Int, CaseIterable, SettingsProtocol {
         
-        ///General settings - language, glucose unit, high and low value
+        ///General settings - language, glucose unit
         case general
+        
+        ///Home Screen settings - urgent high, high, target, low and urgent low values for guidelines
+        case homescreen
         
         /// alarms
         case alarms
@@ -59,11 +62,13 @@ final class SettingsViewController: UIViewController {
         /// developper settings
         case developer
         
-        func viewModel() -> SettingsViewModelProtocol {
+        func viewModel(coreDataManager: CoreDataManager?) -> SettingsViewModelProtocol {
             switch self {
                 
             case .general:
-                return SettingsViewGeneralSettingsViewModel()
+                return SettingsViewGeneralSettingsViewModel(coreDataManager: coreDataManager)
+            case .homescreen:
+                return SettingsViewHomeScreenSettingsViewModel()
             case .alarms:
                 return SettingsViewAlertSettingsViewModel()
             case .nightscout:
@@ -103,7 +108,7 @@ final class SettingsViewController: UIViewController {
         for section in Section.allCases {
 
             // get a viewModel for the section
-            let viewModel = section.viewModel()
+            let viewModel = section.viewModel(coreDataManager: coreDataManager)
             
             // unwrap messageHandler and store in the viewModel
             if let messageHandler = messageHandler {

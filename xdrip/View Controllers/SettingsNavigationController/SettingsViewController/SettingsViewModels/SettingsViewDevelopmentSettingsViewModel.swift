@@ -8,7 +8,9 @@ fileprivate enum Setting:Int, CaseIterable {
     /// to enable OSLog
     case OSLogEnabled = 1
     
-
+    /// case smooth libre values
+    case smoothLibreValues = 2
+    
 }
 
 struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
@@ -22,7 +24,7 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
     }
 
     func sectionTitle() -> String? {
-        return "Developer Settings"
+        return Texts_SettingsView.developerSettings
     }
     
     func settingsRowText(index: Int) -> String {
@@ -32,11 +34,13 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
         switch setting {
             
         case .NSLogEnabled:
-            return "NSLog"
+            return Texts_SettingsView.nsLog
             
         case .OSLogEnabled:
-            return "OSLog"
-
+            return Texts_SettingsView.osLog
+            
+        case .smoothLibreValues:
+            return Texts_SettingsView.smoothLibreValues
             
         }
     }
@@ -47,7 +51,7 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
         
         switch setting {
             
-        case .NSLogEnabled, .OSLogEnabled:
+        case .NSLogEnabled, .OSLogEnabled, .smoothLibreValues:
             return UITableViewCell.AccessoryType.none
             
         }
@@ -63,6 +67,9 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
             return nil
             
         case .OSLogEnabled:
+            return nil
+            
+        case .smoothLibreValues:
             return nil
             
         }
@@ -90,7 +97,15 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
                 UserDefaults.standard.OSLogEnabled = isOn
                 
             })
-            
+                                        
+        case .smoothLibreValues:
+            return UISwitch(isOn: UserDefaults.standard.smoothLibreValues, action: {
+                (isOn:Bool) in
+                
+                UserDefaults.standard.smoothLibreValues = isOn
+                
+            })
+
         }
         
     }
@@ -105,7 +120,7 @@ struct SettingsViewDevelopmentSettingsViewModel:SettingsViewModelProtocol {
         
         switch setting {
             
-        case .NSLogEnabled, .OSLogEnabled:
+        case .NSLogEnabled, .OSLogEnabled, .smoothLibreValues:
             return .nothing
             
         }

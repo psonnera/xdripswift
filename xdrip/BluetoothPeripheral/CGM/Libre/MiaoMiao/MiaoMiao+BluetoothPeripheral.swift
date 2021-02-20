@@ -7,5 +7,5 @@ extension MiaoMiao: BluetoothPeripheral {
         return .MiaoMiaoType
         
     }
-    
+ 
 }

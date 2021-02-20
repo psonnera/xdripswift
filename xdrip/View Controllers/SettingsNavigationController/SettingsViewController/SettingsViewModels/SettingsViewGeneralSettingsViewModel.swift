@@ -5,28 +5,30 @@ fileprivate enum Setting:Int, CaseIterable {
     //blood glucose  unit
     case bloodGlucoseUnit = 0
     
-    //low value
-    case lowMarkValue = 1
-    
-    //high value
-    case highMarkValue = 2
-    
     // choose between master and follower
-    case masterFollower = 3
+    case masterFollower = 1
     
     // should reading be shown in notification
-    case showReadingInNotification = 4
+    case showReadingInNotification = 2
     
     // show reading in app badge
-    case showReadingInAppBadge = 5
+    case showReadingInAppBadge = 3
     
     // if reading is shown in app badge, should value be multiplied with 10 yes or no
-    case multipleAppBadgeValueWith10 = 6
+    case multipleAppBadgeValueWith10 = 4
     
 }
 
 /// conforms to SettingsViewModelProtocol for all general settings in the first sections screen
-struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
+class SettingsViewGeneralSettingsViewModel: SettingsViewModelProtocol {
+    
+    private var coreDataManager: CoreDataManager?
+    
+    init(coreDataManager: CoreDataManager?) {
+        
+        self.coreDataManager = coreDataManager
+        
+    }
     
     func storeRowReloadClosure(rowReloadClosure: ((Int) -> Void)) {}
     
@@ -39,7 +41,8 @@ struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
     func completeSettingsViewRefreshNeeded(index: Int) -> Bool {
         
         // changing follower to master or master to follower requires changing ui for nightscout settings and transmitter type settings
-        if index == Setting.masterFollower.rawValue {return true}
+        // the same applies when changing bloodGlucoseUnit, because off the seperate section with bgObjectives
+        if (index == Setting.masterFollower.rawValue || index == Setting.bloodGlucoseUnit.rawValue) {return true}
         
         return false
     }
@@ -52,26 +55,59 @@ struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
         guard let setting = Setting(rawValue: index) else { fatalError("Unexpected Section") }
 
         switch setting {
+            
         case .bloodGlucoseUnit:
-            return SettingsSelectedRowAction.callFunction(function: {UserDefaults.standard.bloodGlucoseUnitIsMgDl ? (UserDefaults.standard.bloodGlucoseUnitIsMgDl) = false : (UserDefaults.standard.bloodGlucoseUnitIsMgDl = true)})
-            
-        case .lowMarkValue:
-            return SettingsSelectedRowAction.askText(title: Texts_SettingsView.labelLowValue, message: nil, keyboardType: UserDefaults.standard.bloodGlucoseUnitIsMgDl ? .numberPad:.decimalPad, text: UserDefaults.standard.lowMarkValueInUserChosenUnitRounded, placeHolder: ConstantsBGGraphBuilder.defaultLowMarkInMgdl.description, actionTitle: nil, cancelTitle: nil, actionHandler: {(lowMarkValue:String) in UserDefaults.standard.lowMarkValueInUserChosenUnitRounded = lowMarkValue}, cancelHandler: nil, inputValidator: nil)
+            return SettingsSelectedRowAction.callFunction(function: {
+                
+                UserDefaults.standard.bloodGlucoseUnitIsMgDl ? (UserDefaults.standard.bloodGlucoseUnitIsMgDl = false) : (UserDefaults.standard.bloodGlucoseUnitIsMgDl = true)
+                
+            })
 
-        case .highMarkValue:
-            return SettingsSelectedRowAction.askText(title: Texts_SettingsView.labelHighValue, message: nil, keyboardType: UserDefaults.standard.bloodGlucoseUnitIsMgDl ? .numberPad:.decimalPad, text: UserDefaults.standard.highMarkValueInUserChosenUnitRounded, placeHolder: ConstantsBGGraphBuilder.defaultHighMmarkInMgdl.description, actionTitle: nil, cancelTitle: nil, actionHandler: {(highMarkValue:String) in UserDefaults.standard.highMarkValueInUserChosenUnitRounded = highMarkValue}, cancelHandler: nil, inputValidator: nil)
-            
         case .masterFollower:
             
-            return SettingsSelectedRowAction.callFunction(function: {
-                if UserDefaults.standard.isMaster {
-                    UserDefaults.standard.isMaster = false
-                } else {
-                    UserDefaults.standard.isMaster = true
-                }
+            // switching from master to follower will set cgm transmitter to nil and stop the sensor. If there's a sensor active then it's better to ask for a confirmation, if not then do the change without asking confirmation
 
-            })
+            if UserDefaults.standard.isMaster {
                 
+                if let coreDataManager = coreDataManager {
+                    
+                    if SensorsAccessor(coreDataManager: coreDataManager).fetchActiveSensor() != nil {
+
+                        return .askConfirmation(title: Texts_Common.warning, message: Texts_SettingsView.warningChangeFromMasterToFollower, actionHandler: {
+                            
+                            UserDefaults.standard.isMaster = false
+                            
+                        }, cancelHandler: nil)
+
+                    } else {
+                        
+                        // no sensor active
+                        // set to follower
+                        return SettingsSelectedRowAction.callFunction(function: {
+                            UserDefaults.standard.isMaster = false
+                        })
+                        
+                    }
+                    
+                } else {
+                    
+                    // coredata manager is nil, should normally not be the case
+                    return SettingsSelectedRowAction.callFunction(function: {
+                        UserDefaults.standard.isMaster = false
+                    })
+
+                }
+                
+                
+            } else {
+                
+                // switching from follower to master
+                return SettingsSelectedRowAction.callFunction(function: {
+                    UserDefaults.standard.isMaster = true
+                })
+
+            }
+            
         case .showReadingInNotification, .showReadingInAppBadge, .multipleAppBadgeValueWith10:
             return SettingsSelectedRowAction.nothing
             
@@ -102,12 +138,6 @@ struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
         case .bloodGlucoseUnit:
             return Texts_SettingsView.labelSelectBgUnit
             
-        case .lowMarkValue:
-            return Texts_SettingsView.labelLowValue
-            
-        case .highMarkValue:
-            return Texts_SettingsView.labelHighValue
-            
         case .masterFollower:
             return Texts_SettingsView.labelMasterOrFollower
             
@@ -130,13 +160,7 @@ struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
             
         case .bloodGlucoseUnit:
             return UITableViewCell.AccessoryType.none
-            
-        case .lowMarkValue:
-            return UITableViewCell.AccessoryType.disclosureIndicator
-            
-        case .highMarkValue:
-            return UITableViewCell.AccessoryType.disclosureIndicator
-            
+    
         case .masterFollower:
             return UITableViewCell.AccessoryType.none
             
@@ -153,12 +177,6 @@ struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
             
         case .bloodGlucoseUnit:
             return UserDefaults.standard.bloodGlucoseUnitIsMgDl ? Texts_Common.mgdl:Texts_Common.mmol
-            
-        case .lowMarkValue:
-            return UserDefaults.standard.lowMarkValueInUserChosenUnit.bgValuetoString(mgdl: UserDefaults.standard.bloodGlucoseUnitIsMgDl)
-            
-        case .highMarkValue:
-            return UserDefaults.standard.highMarkValueInUserChosenUnit.bgValuetoString(mgdl: UserDefaults.standard.bloodGlucoseUnitIsMgDl)
             
         case .masterFollower:
             return UserDefaults.standard.isMaster ? Texts_SettingsView.master:Texts_SettingsView.follower
@@ -187,7 +205,7 @@ struct SettingsViewGeneralSettingsViewModel:SettingsViewModelProtocol {
 
             return UISwitch(isOn: UserDefaults.standard.multipleAppBadgeValueWith10, action: {(isOn:Bool) in UserDefaults.standard.multipleAppBadgeValueWith10 = isOn})
 
-        case .bloodGlucoseUnit, .highMarkValue, .lowMarkValue, .masterFollower:
+        case .bloodGlucoseUnit, .masterFollower:
             return nil
             
         }

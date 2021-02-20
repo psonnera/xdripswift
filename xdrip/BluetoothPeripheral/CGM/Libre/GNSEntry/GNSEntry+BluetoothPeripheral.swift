@@ -7,5 +7,5 @@ extension GNSEntry: BluetoothPeripheral {
         return .GNSentryType
         
     }
-    
+ 
 }

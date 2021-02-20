@@ -105,20 +105,25 @@ public class HealthKitManager:NSObject {
         // bloodGlucoseType should not be nil
         guard let bloodGlucoseType = bloodGlucoseType else {return}
         
-          // get readings to store, limit to 2016 = maximum 1 week - just to avoid a huge array is being returned here
-        let bgReadingsToStore = bgReadingsAccessor.getLatestBgReadings(limit: 2016, fromDate: UserDefaults.standard.timeStampLatestHealthKitStoreBgReading, forSensor: nil, ignoreRawData: true, ignoreCalculatedValue: false)
+          // get readings to store, limit to 2016 = maximum 1 week - just to avoid a huge array is being returned here, applying minimumTimeBetweenTwoReadingsInMinutes filter
+        let bgReadingsToStore = bgReadingsAccessor.getLatestBgReadings(limit: 2016, fromDate: UserDefaults.standard.timeStampLatestHealthKitStoreBgReading, forSensor: nil, ignoreRawData: true, ignoreCalculatedValue: false).filter(minimumTimeBetweenTwoReadingsInMinutes: ConstantsHealthKit.minimiumTimeBetweenTwoReadingsInMinutes, lastConnectionStatusChangeTimeStamp: nil, timeStampLastProcessedBgReading: UserDefaults.standard.timeStampLatestHealthKitStoreBgReading)
         
         let bloodGlucoseUnit = HKUnit.init(from: "mg/dL")
         
         if bgReadingsToStore.count > 0 {
+
             for (_, bgReading) in bgReadingsToStore.enumerated().reversed() {// reversed order because the first element is the youngest
                 
                 let quantity = HKQuantity.init(unit: bloodGlucoseUnit, doubleValue: bgReading.calculatedValue)
                 let sample = HKQuantitySample.init(type: bloodGlucoseType, quantity: quantity, start: bgReading.timeStamp, end: bgReading.timeStamp)
+                
+                // store the timestamp of the last reading to upload, here in the main thread, because we use a bgReading for it, which is retrieved in the main mangedObjectContext
+                let timeStampLastReadingToUpload = bgReading.timeStamp
+                
                 healthStore.save(sample, withCompletion: {
                     (success:Bool, error:Error?) in
                     if success {
-                        UserDefaults.standard.timeStampLatestHealthKitStoreBgReading = bgReading.timeStamp
+                        UserDefaults.standard.timeStampLatestHealthKitStoreBgReading = timeStampLastReadingToUpload
                     } else {
                         if let error = error {
                             trace("failed store reading in healthkit, error = %{public}@", log: self.log, category: ConstantsLog.categoryHealthKitManager, type: .error, error.localizedDescription)

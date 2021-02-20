@@ -42,6 +42,12 @@ enum BluetoothPeripheralType: String, CaseIterable {
       
     /// watlaa master
     case WatlaaType = "Watlaa"
+    
+    /// Libre 2
+    case Libre2Type = "Libre 2"
+    
+    /// Atom
+    case AtomType = "Atom"
 
     /// - returns: the BluetoothPeripheralViewModel. If nil then there's no specific settings for the tpe of bluetoothPeripheral
     func viewModel() -> BluetoothPeripheralViewModel? {
@@ -83,6 +89,12 @@ enum BluetoothPeripheralType: String, CaseIterable {
             
         case .DexcomG6Type:
             return DexcomG6BluetoothPeripheralViewModel()
+            
+        case .Libre2Type:
+            return Libre2BluetoothPeripheralViewModel()
+            
+        case .AtomType:
+            return AtomBluetoothPeripheralViewModel()
             
         }
         
@@ -149,6 +161,14 @@ enum BluetoothPeripheralType: String, CaseIterable {
             
             return DexcomG4(address: address, name: name, alias: nil, nsManagedObjectContext: nsManagedObjectContext)
             
+        case .Libre2Type:
+            
+            return Libre2(address: address, name: name, alias: nil, nsManagedObjectContext: nsManagedObjectContext)
+            
+        case .AtomType:
+            
+            return Atom(address: address, name: name, alias: nil, nsManagedObjectContext: nsManagedObjectContext)
+            
         }
         
     }
@@ -161,7 +181,7 @@ enum BluetoothPeripheralType: String, CaseIterable {
         case .M5StackType, .M5StickCType:
             return .M5Stack
             
-        case .DexcomG5Type, .BubbleType, .MiaoMiaoType, .BluconType, .GNSentryType, .BlueReaderType, .DropletType, .DexcomG4Type, .DexcomG6Type, .WatlaaType:
+        case .DexcomG5Type, .BubbleType, .MiaoMiaoType, .BluconType, .GNSentryType, .BlueReaderType, .DropletType, .DexcomG4Type, .DexcomG6Type, .WatlaaType, .Libre2Type, .AtomType:
             return .CGM
             
         }
@@ -173,7 +193,7 @@ enum BluetoothPeripheralType: String, CaseIterable {
         
         switch self {
             
-        case .M5StackType, .M5StickCType, .WatlaaType, .BubbleType, .MiaoMiaoType, .GNSentryType, .BlueReaderType, .DropletType:
+        case .M5StackType, .M5StickCType, .WatlaaType, .BubbleType, .MiaoMiaoType, .GNSentryType, .BlueReaderType, .DropletType, .Libre2Type, .AtomType:
             return false
             
         case .DexcomG5Type, .BluconType, .DexcomG4Type, .DexcomG6Type:
@@ -223,7 +243,7 @@ enum BluetoothPeripheralType: String, CaseIterable {
             }
             return nil
             
-        case .M5StackType, .M5StickCType, .WatlaaType, .BubbleType, .MiaoMiaoType, .GNSentryType, .BlueReaderType, .DropletType:
+        case .M5StackType, .M5StickCType, .WatlaaType, .BubbleType, .MiaoMiaoType, .GNSentryType, .BlueReaderType, .DropletType, .Libre2Type, .AtomType:
             // no transmitter id means no validation to do
             return nil
             
@@ -243,7 +263,7 @@ enum BluetoothPeripheralType: String, CaseIterable {
         
     }
     
-    /// is it web oop enabled or not
+    /// is it web oop supported or not.
     func canWebOOP() -> Bool {
         
         switch self {
@@ -251,11 +271,33 @@ enum BluetoothPeripheralType: String, CaseIterable {
         case .M5StackType, .M5StickCType, .WatlaaType, .DexcomG4Type, .DexcomG5Type, .DexcomG6Type, .BluconType, .BlueReaderType, .DropletType , .GNSentryType:
             return false
             
-        case .BubbleType, .MiaoMiaoType:
+        case .BubbleType, .MiaoMiaoType, .AtomType:
+            return true
+            
+        case .Libre2Type:
+            // oop web can still be used for Libre2 because in the end the data received is Libre 1 format, we can use oop web to get slope parameters
             return true
                         
         }
         
+    }
+    
+    /// can use non fixed slopes or not
+    func canUseNonFixedSlope() -> Bool {
+       
+       switch self {
+           
+       case .M5StackType, .M5StickCType, .DexcomG4Type, .DexcomG5Type, .DexcomG6Type:
+           return false
+           
+       case .BubbleType, .MiaoMiaoType, .WatlaaType, .BluconType, .BlueReaderType, .DropletType , .GNSentryType, .AtomType:
+           return true
+        
+       case .Libre2Type:
+            return true
+
+       }
+       
     }
     
 }

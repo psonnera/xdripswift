@@ -15,7 +15,9 @@ class CalibrationsAccessor {
     // MARK: - initializer
     
     init(coreDataManager:CoreDataManager) {
+        
         self.coreDataManager = coreDataManager
+        
     }
     
     // MARK: - functions
@@ -80,6 +82,67 @@ class CalibrationsAccessor {
         return calibrations
     }
     
+    /// gets calibrations, synchronously, in the managedObjectContext's thread
+    /// - returns:
+    ///        calibrations sorted by timestamp, ascending (ie first is oldest)
+    /// - parameters:
+    ///     - to : if specified, only return calibrations with timestamp  smaller than fromDate (not equal to)
+    ///     - from : if specified, only return calibrations with timestamp greater than fromDate (not equal to)
+    ///     - managedObjectContext : the ManagedObjectContext to use
+    func getCalibrations(from: Date?, to: Date?, on managedObjectContext: NSManagedObjectContext) -> [Calibration] {
+        
+        let fetchRequest: NSFetchRequest<Calibration> = Calibration.fetchRequest()
+        fetchRequest.sortDescriptors = [NSSortDescriptor(key: #keyPath(Calibration.timeStamp), ascending: true)]
+        
+        // create predicate
+        if let from = from, to == nil {
+            let predicate = NSPredicate(format: "timeStamp > %@", NSDate(timeIntervalSince1970: from.timeIntervalSince1970))
+            fetchRequest.predicate = predicate
+        } else if let to = to, from == nil {
+            let predicate = NSPredicate(format: "timeStamp < %@", NSDate(timeIntervalSince1970: to.timeIntervalSince1970))
+            fetchRequest.predicate = predicate
+        } else if let to = to, let from = from {
+            let predicate = NSPredicate(format: "timeStamp < %@ AND timeStamp > %@", NSDate(timeIntervalSince1970: to.timeIntervalSince1970), NSDate(timeIntervalSince1970: from.timeIntervalSince1970))
+            fetchRequest.predicate = predicate
+        }
+        
+        var calibrations = [Calibration]()
+        
+        managedObjectContext.performAndWait {
+            do {
+                // Execute Fetch Request
+                calibrations = try fetchRequest.execute()
+            } catch {
+                let fetchError = error as NSError
+                trace("in getCalibrations, Unable to Execute Calibration Fetch Request : %{public}@", log: self.log, category: ConstantsLog.categoryApplicationDataCalibrations, type: .error, fetchError.localizedDescription)
+            }
+        }
+        
+        return calibrations
+        
+    }
+
+    /// deletes Calibration, synchronously, in the managedObjectContext's thread
+    ///     - calibration : calibration to delete
+    ///     - managedObjectContext : the ManagedObjectContext to use
+    func delete(calibration: Calibration, on managedObjectContext: NSManagedObjectContext) {
+        
+        managedObjectContext.performAndWait {
+            
+            managedObjectContext.delete(calibration)
+            
+            // save changes to coredata
+            do {
+                try managedObjectContext.save()
+            } catch {
+                trace("in delete calibration,  Unable to Save Changes, error.localizedDescription  = %{public}@", log: self.log, category: ConstantsLog.categoryApplicationDataCalibrations, type: .error, error.localizedDescription)
+            }
+
+        }
+                
+    }
+    
+
     // MARK: - private helper functions
     
     private func getFirstOrLastCalibration(withActivesensor sensor:Sensor, first:Bool) -> Calibration? {

@@ -70,9 +70,6 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
     //timestamp of last reading
     private var timeStampOfLastG5Reading:Date
     
-    //timestamp of last battery read
-    private var timeStampOfLastBatteryReading:Date
-    
     //timestamp of transmitterReset
     private var timeStampTransmitterReset:Date
     
@@ -97,6 +94,9 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
     /// true if pairing request was done, and waiting to see if pairing was done
     private var waitingPairingConfirmation = false
     
+    // to swap between request firmware or battery
+    var requestFirmware = true
+
     // MARK: - functions
     
     /// - parameters:
@@ -116,9 +116,6 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
         
         // set timestampoflastg5reading to 0
         self.timeStampOfLastG5Reading = Date(timeIntervalSince1970: 0)
-        
-        //set timeStampOfLastBatteryReading to 0
-        self.timeStampOfLastBatteryReading = Date(timeIntervalSince1970: 0)
         
         //set timeStampTransmitterReset to 0
         self.timeStampTransmitterReset = Date(timeIntervalSince1970: 0)
@@ -150,7 +147,7 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
     
     /// for testing, used by temptesting
     @objc private func createTestReading() {
-        let testdata = GlucoseData(timeStamp: Date(), glucoseLevelRaw: testAmount, glucoseLevelFiltered: testAmount)
+        let testdata = GlucoseData(timeStamp: Date(), glucoseLevelRaw: testAmount)
         debuglogging("timestamp testdata = " + testdata.timeStamp.description + ", with amount = " + testAmount.description)
         var testdataasarray = [testdata]
         cgmTransmitterDelegate?.cgmTransmitterInfoReceived(glucoseData: &testdataasarray, transmitterBatteryInfo: nil, sensorTimeInMinutes: nil)
@@ -173,9 +170,17 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
         
     }
     
-    // MARK: BluetoothTransmitter overriden functions
-    
-    /// to ask pairing
+    // MARK: - deinit
+
+    deinit {
+        
+        // if deinit is called, it means user deletes the transmitter or clicks 'stop scanning' or 'disconnect'.  TimeStampOfLastBatteryReading must be set to nil to make sure if new transmitter is added, battery read is done again
+        UserDefaults.standard.timeStampOfLastBatteryReading = nil
+        
+    }
+
+    // MARK: - BluetoothTransmitter overriden functions
+
     override func initiatePairing() {
         // assuming that the transmitter is effectively awaiting the pairing, otherwise this obviously won't work
         sendPairingRequest()
@@ -193,6 +198,12 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
             bluetoothTransmitterDelegate?.pairingFailed()
             
         }
+        
+        // setting characteristics to nil, they will be reinitialized at next connect
+        writeControlCharacteristic = nil
+        receiveAuthenticationCharacteristic = nil
+        communicationCharacteristic = nil
+        backfillCharacteristic = nil
         
     }
 
@@ -255,10 +266,6 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
         
         if let value = characteristic.value {
             
-            //only for logging
-            let data = value.hexEncodedString()
-            trace("    data = %{public}@", log: log, category: ConstantsLog.categoryCGMG5, type: .debug, data)
-            
             //check type of message and process according to type
             if let firstByte = value.first {
                 if let opCode = DexcomTransmitterOpCode(rawValue: firstByte) {
@@ -319,26 +326,37 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
                         
                         if let sensorDataRxMessage = SensorDataRxMessage(data: value) {
                             
-                            if firmware != nil {
+                            // should we request firmware or battery level
+                            if !requestFirmware {
+                                
+                                // request battery level now, next time request firmware
+                                requestFirmware = true
                                 
                                 // transmitterversion was already recceived, let's see if we need to get the batterystatus
-                                if Date() > Date(timeInterval: ConstantsDexcomG5.batteryReadPeriodInHours * 60 * 60, since: timeStampOfLastBatteryReading) {
+                                if Date() > Date(timeInterval: ConstantsDexcomG5.batteryReadPeriodInHours * 60 * 60, since: UserDefaults.standard.timeStampOfLastBatteryReading != nil ? UserDefaults.standard.timeStampOfLastBatteryReading! : Date(timeIntervalSince1970: 0)) {
                                     trace("    last battery reading was long time ago, requesting now", log: log, category: ConstantsLog.categoryCGMG5, type: .info)
                                     if let writeControlCharacteristic = writeControlCharacteristic {
                                         _ = writeDataToPeripheral(data: BatteryStatusTxMessage().data, characteristicToWriteTo: writeControlCharacteristic, type: .withResponse)
-                                        timeStampOfLastBatteryReading = Date()
+                                        
+                                        // UserDefaults.standard.timeStampOfLastBatteryReading value in userdefaults will be set implicitly because the cgmTransmitterDelegate is also storing the transmitterbatteryinfo, which updates the timeStampOfLastBatteryReading in the UserDefaults
+
+                                        
                                     } else {
+                                        
                                         trace("    writeControlCharacteristic is nil, can not send BatteryStatusTxMessage", log: log, category: ConstantsLog.categoryCGMG5, type: .error)
+                                        
                                     }
                                 } else {
                                     disconnect()
                                 }
                             } else {
                                 
-                                if let writeControlCharacteristic = writeControlCharacteristic {
-                                    _ = writeDataToPeripheral(data: TransmitterVersionTxMessage().data, characteristicToWriteTo: writeControlCharacteristic, type: .withResponse)
-                                } else {
-                                    trace("    writeControlCharacteristic is nil, can not send TransmitterVersionTxMessage", log: log, category: ConstantsLog.categoryCGMG5, type: .error)
+                                // request firmware now, next time request battery level
+                                requestFirmware = false
+
+                                if firmware == nil {
+
+                                    
                                 }
                             }
                             
@@ -360,13 +378,13 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
                                         
                                         trace("    received unfiltered value 2096896.0, which is caused by low battery. Creating error message", log: log, category: ConstantsLog.categoryCGMG5, type: .info)
                                         
-                                        cgmTransmitterDelegate?.error(message: Texts_HomeView.dexcomBatteryTooLow)
+                                        cgmTransmitterDelegate?.errorOccurred(xDripError: DexcomError.receivedEnfilteredValue2096896)
                                         
                                     } else {
 
                                         timeStampOfLastG5Reading = Date()
                                         
-                                        let glucoseData = GlucoseData(timeStamp: sensorDataRxMessage.timestamp, glucoseLevelRaw: scaleRawValue(firmwareVersion: firmware, rawValue: sensorDataRxMessage.unfiltered), glucoseLevelFiltered: scaleRawValue(firmwareVersion: firmware, rawValue: sensorDataRxMessage.unfiltered))
+                                        let glucoseData = GlucoseData(timeStamp: sensorDataRxMessage.timestamp, glucoseLevelRaw: scaleRawValue(firmwareVersion: firmware, rawValue: sensorDataRxMessage.unfiltered))
                                         
                                         var glucoseDataArray = [glucoseData]
                                         
@@ -504,17 +522,21 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
     func reset(requested:Bool) {
         G5ResetRequested = requested
     }
-    
+
+    /// this transmitter does not support Libre non fixed slopes
+    func setNonFixedSlopeEnabled(enabled: Bool) {    
+    }
+
     /// this transmitter does not support oopWeb
     func setWebOOPEnabled(enabled: Bool) {
     }
     
-    func setWebOOPSite(oopWebSite: String) {}
-    
-    func setWebOOPToken(oopWebToken: String) {}
-
     func cgmTransmitterType() -> CGMTransmitterType {
         return .dexcomG5
+    }
+
+    func isNonFixedSlopeEnabled() -> Bool {
+        return false
     }
     
     func isWebOOPEnabled() -> Bool {
@@ -522,7 +544,7 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
     }
     
     func requestNewReading() {
-        // not supported for blucon
+        // not supported for Dexcom G5
     }
     
     // MARK:- helper functions
@@ -573,7 +595,7 @@ class CGMG5Transmitter:BluetoothTransmitter, CGMTransmitter {
     private func processBatteryStatusRxMessage(value:Data) {
         
         if let batteryStatusRxMessage = BatteryStatusRxMessage(data: value) {
-            
+
             // cGMG5TransmitterDelegate for showing info on bluetoothviewcontroller and store in coredata
             cGMG5TransmitterDelegate?.received(transmitterBatteryInfo: TransmitterBatteryInfo.DexcomG5(voltageA: batteryStatusRxMessage.voltageA, voltageB: batteryStatusRxMessage.voltageB, resist: batteryStatusRxMessage.resist, runtime: batteryStatusRxMessage.runtime, temperature: batteryStatusRxMessage.temperature), cGMG5Transmitter: self)
             

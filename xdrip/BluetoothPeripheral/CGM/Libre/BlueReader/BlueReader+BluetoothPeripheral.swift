@@ -9,5 +9,5 @@ extension BlueReader: BluetoothPeripheral {
         return .GNSentryType
         
     }
-    
+  
 }

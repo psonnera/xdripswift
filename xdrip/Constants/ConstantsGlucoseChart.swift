@@ -6,12 +6,11 @@ enum ConstantsGlucoseChart {
     static let defaultChartWidthInHours = 6.0;
     
     /// default value for timeformat for labels in chart, time axis
-    ///
     /// H is hour 24 hour format, "h a" is hour 12 hour format  with a either am or pm
-    static let defaultTimeAxisLabelFormat = "H"
+    /// options can be "H", "HH", "HH:00"
+    static let defaultTimeAxisLabelFormat = "HH"
     
     /// usually 40.0 mgdl is the lowest value that cgm's give, putting it to 38 guarantees the points will always be visible
-    ///
     /// only in mgdl because the label will not be shown, hence no bizar values to be shown when going to mgdl
     static let absoluteMinimumChartValueInMgdl = 38.0
     
@@ -34,17 +33,38 @@ enum ConstantsGlucoseChart {
     static let thirdGlucoseValueRangeInMmol = [21.0, 23.0]
     
     /// axis line color    (make white to match new dark UI theme)
-    static let axisLineColor = UIColor.gray
+    static let axisLineColor = UIColor.darkGray
     
     /// axis line label    (make white to match new dark UI theme)
     static let axisLabelColor = UIColor.white
     
-    /// grid color
-    static let gridColor = UIColor.gray
+    /// grid color to use if useObjectives is not enabled
+    static let gridColor = UIColor.darkGray
     
-    /// glucose color
-    static let glucoseTintColor = UIColor.cyan
+    /// grid color to use if useObjectives is enabled
+    static let gridColorObjectives = UIColor.darkGray.withAlphaComponent(0.4)
     
+    // objective/target range guidelines. Will use either standard gray or colored lines
+    // make use alpha components to make the perceived brightness of each line be the same to the user (otherwise red appears washed out)
+    
+    /// color for urgent high and urgent low line
+    static let guidelineUrgentHighLow = UIColor.lightGray.withAlphaComponent(0.8)
+    
+    /// color for urgent high and urgent low line
+    static let guidelineHighLow = UIColor.lightGray.withAlphaComponent(1)
+    
+    /// color for target line
+    static let guidelineTargetColor = UIColor.green.withAlphaComponent(0.5)
+    
+    /// glucose colors - for values in range
+    static let glucoseInRangeColor = UIColor.green
+    
+    /// glucose colors - for values higher than urgentHighMarkValue or lower than urgent LowMarkValue
+    static let glucoseUrgentRangeColor = UIColor.red
+
+    /// glucose colors - for values between highMarkValue and urgentHighMarkValue or between urgentLowMarkValue and lowMarkValue
+    static let glucoseNotUrgentRangeColor = UIColor.yellow
+
     /// labels width for vertical axis
     static let yAxisLabelsWidth: CGFloat = 30
     

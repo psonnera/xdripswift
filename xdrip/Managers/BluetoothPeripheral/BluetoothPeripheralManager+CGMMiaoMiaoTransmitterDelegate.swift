@@ -2,6 +2,29 @@ import Foundation
 
 extension BluetoothPeripheralManager: CGMMiaoMiaoTransmitterDelegate {
     
+    func received(sensorStatus: LibreSensorState, from cGMMiaoMiaoTransmitter: CGMMiaoMiaoTransmitter) {
+        
+        guard let miaoMiao = findTransmitter(cGMMiaoMiaoTransmitter: cGMMiaoMiaoTransmitter) else {return}
+        
+        // store serial number in miaoMiao object
+        miaoMiao.sensorState = sensorStatus
+        
+        // no coredatamanager savechanges needed because batterylevel is not stored in coredata
+        
+    }
+    
+    func received(libreSensorType: LibreSensorType, from cGMMiaoMiaoTransmitter: CGMMiaoMiaoTransmitter) {
+        
+        guard let miaoMiao = findTransmitter(cGMMiaoMiaoTransmitter: cGMMiaoMiaoTransmitter) else {return}
+        
+        // store libreSensorType in miaoMiao.blePeripheral object
+        miaoMiao.blePeripheral.libreSensorType = libreSensorType
+        
+        // coredatamanager savechanges needed because webOOPEnabled is stored in coredata
+        coreDataManager.saveChanges()
+        
+    }
+
     func received(batteryLevel: Int, from cGMMiaoMiaoTransmitter: CGMMiaoMiaoTransmitter) {
         
         guard let miaoMiao = findTransmitter(cGMMiaoMiaoTransmitter: cGMMiaoMiaoTransmitter) else {return}

@@ -66,7 +66,9 @@ class DexcomShareUploadManager:NSObject {
     // MARK: - public functions
     
     /// uploads latest BgReadings to Dexcom Share
-    public func upload() {
+    /// - parameters:
+    ///     - lastConnectionStatusChangeTimeStamp : when was the last transmitter dis/reconnect - if nil then  1 1 1970 is used
+    public func upload(lastConnectionStatusChangeTimeStamp: Date?) {
         
         // check if dexcomShare is enabled
         guard UserDefaults.standard.uploadReadingstoDexcomShare else {return}
@@ -87,7 +89,7 @@ class DexcomShareUploadManager:NSObject {
         }
         
         // upload
-        uploadBgReadingsToDexcomShare(firstAttempt: true)
+        uploadBgReadingsToDexcomShare(firstAttempt: true, lastConnectionStatusChangeTimeStamp: lastConnectionStatusChangeTimeStamp)
         
     }
 
@@ -114,7 +116,8 @@ class DexcomShareUploadManager:NSObject {
                                     if success {
                                         trace("in observeValue, start upload", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
                                         
-                                        self.upload()
+                                        // set lastConnectionStatusChangeTimeStamp to as late as possible, to make sure that the most recent reading is uploaded if user is testing the credentials
+                                        self.upload(lastConnectionStatusChangeTimeStamp: Date())
                                         
                                     } else {
                                         trace("in observeValue, Dexcom Share credential check failed", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .error)
@@ -143,8 +146,10 @@ class DexcomShareUploadManager:NSObject {
                                         if success {
                                             
                                             trace("in observeValue, start upload", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
-                                            self.upload()
-
+                                            
+                                            // set lastConnectionStatusChangeTimeStamp to as late as possible, to make sure that the most recent reading is uploaded if user is testing the credentials
+                                            self.upload(lastConnectionStatusChangeTimeStamp: Date())
+                                            
                                         } else {
                                             
                                             trace("in observeValue, Dexcom Share credential check failed", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .error)
@@ -170,9 +175,11 @@ class DexcomShareUploadManager:NSObject {
     // MARK: - private helper functions
     
     /// will call StartRemoteMonitoringSession with serialNumber
+    /// - parameters:
+    ///     - lastConnectionStatusChangeTimeStamp : when was the last transmitter dis/reconnect - if nil then  1 1 1970 is used
     ///
     /// dexcomShareSessionId and UserDefaults.standard.dexcomShareSerialNumber should be not nil
-    private func startRemoteMonitoringSessionAndStartUpload() {
+    private func startRemoteMonitoringSessionAndStartUpload(lastConnectionStatusChangeTimeStamp: Date?) {
         
         trace("in startRemoteMonitoringSessionAndStartUpload", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
         
@@ -208,18 +215,15 @@ class DexcomShareUploadManager:NSObject {
         let sharedSession = URLSession.shared
 
         // Create upload Task
-        let dataTask = sharedSession.uploadTask(with: request, from: "".data(using: .utf8), completionHandler: { (data, response, error) -> Void in
+        let task = sharedSession.uploadTask(with: request, from: "".data(using: .utf8), completionHandler: { (data, response, error) -> Void in
             
-            trace("in startRemoteMonitoringSessionAndStartUpload, in uploadTask completionHandlself.er", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
+            trace("in startRemoteMonitoringSessionAndStartUpload, finished task", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
             
-            // if ends without success then log the data when existing the scope
-            var success = false
+            // log the data when existing the scope
             defer {
-                if !success {
-                    if let data = data {
-                        if let dataAsString = String(bytes: data, encoding: .utf8) {
-                            trace("    data = %{public}@", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .error, dataAsString)
-                        }
+                if let data = data {
+                    if let dataAsString = String(bytes: data, encoding: .utf8) {
+                        trace("    data = %{public}@", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .error, dataAsString)
                     }
                 }
             }
@@ -277,7 +281,7 @@ class DexcomShareUploadManager:NSObject {
                     
                     //there's no error, call uploadBgReadingsToDexcomShare in main thread
                     DispatchQueue.main.async {
-                        self.uploadBgReadingsToDexcomShare(firstAttempt: true)
+                        self.uploadBgReadingsToDexcomShare(firstAttempt: true, lastConnectionStatusChangeTimeStamp: lastConnectionStatusChangeTimeStamp)
                     }
                     
                 } else {
@@ -292,16 +296,18 @@ class DexcomShareUploadManager:NSObject {
             
         })
         
-        dataTask.resume()
+        trace("in startRemoteMonitoringSessionAndStartUpload, calling task.resume", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
+        task.resume()
 
     }
     
     /// will try to upload the latest readings - if dexcomShareSessionId is nil then first a login attempt will be done and after that an upload.
     /// - parameters:
     ///     - firstAttempt : if true, and if dexcomShareSessionId not nil, but upload attempt fails with because dexcomShareSessionId is not valid, then a new login attempt will be done, after which a new upload attempt - if false, then no new upload attempt will be done
+    ///     - lastConnectionStatusChangeTimeStamp : when was the last transmitter dis/reconnect - if nil then  1 1 1970 is used
     ///
     /// firstAttempt is there to avoid that the app runs in an endless loop
-    private func uploadBgReadingsToDexcomShare(firstAttempt:Bool) {
+    private func uploadBgReadingsToDexcomShare(firstAttempt:Bool, lastConnectionStatusChangeTimeStamp: Date?) {
         
         trace("in uploadBgReadingsToDexcomShare", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
         
@@ -321,7 +327,7 @@ class DexcomShareUploadManager:NSObject {
                     if success {
                         trace("in uploadBgReadingsToDexcomShare, login successful, will restart uploadBgReadingsToDexcomShare", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
                         // retry the upload
-                        self.uploadBgReadingsToDexcomShare(firstAttempt: firstAttempt)
+                        self.uploadBgReadingsToDexcomShare(firstAttempt: firstAttempt, lastConnectionStatusChangeTimeStamp: lastConnectionStatusChangeTimeStamp)
                     } else {
                         trace("in uploadBgReadingsToDexcomShare, login failed, no further processing", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .error)
                     }
@@ -330,12 +336,15 @@ class DexcomShareUploadManager:NSObject {
             return
         }
         
-        // get readings to upload, limit to 8 hours
+        // get timestamp of first reading to upload, limit to 8 hours
         var timeStamp = Date(timeIntervalSinceNow: -8*60*60)
         if let timeStampLatestDexcomShareUploadedBgReading = UserDefaults.standard.timeStampLatestDexcomShareUploadedBgReading {
             timeStamp = timeStampLatestDexcomShareUploadedBgReading
         }
-        let bgReadingsToUpload = bgReadingsAccessor.getLatestBgReadings(limit: nil, fromDate: timeStamp, forSensor: nil, ignoreRawData: true, ignoreCalculatedValue: false)
+        
+        // get readings to upload, applying minimumTimeBetweenTwoReadingsInMinutes filter
+        let bgReadingsToUpload = bgReadingsAccessor.getLatestBgReadings(limit: nil, fromDate: timeStamp, forSensor: nil, ignoreRawData: true, ignoreCalculatedValue: false).filter(minimumTimeBetweenTwoReadingsInMinutes: ConstantsDexcomShare.minimiumTimeBetweenTwoReadingsInMinutes, lastConnectionStatusChangeTimeStamp: lastConnectionStatusChangeTimeStamp, timeStampLastProcessedBgReading: timeStamp)
+        
         trace("    number of readings to upload : %{public}@", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info, bgReadingsToUpload.count.description)
 
         // if no no readings to upload, no further processing
@@ -350,9 +359,6 @@ class DexcomShareUploadManager:NSObject {
             return
         }
         
-        // get shared URLSession
-        let sharedSession = URLSession.shared
-        
         // create upload data as dictionary
         let bgReadingsDictionaryRepresentation = bgReadingsToUpload.map({$0.dictionaryRepresentationForDexcomShareUpload})
         let uploadDataAsDictionary:[String : Any] = [
@@ -361,15 +367,18 @@ class DexcomShareUploadManager:NSObject {
             "TA" : -5
         ]
         
+        // store the timestamp of the last reading to upload, here in the main thread, because we use a bgReading for it, which is retrieved in the main mangedObjectContext
+        let timeStampLastReadingToUpload = bgReadingsToUpload.first != nil ? bgReadingsToUpload.first!.timeStamp : nil
+
         do {
             
             // create upload data in json format
             let uploadData = try JSONSerialization.data(withJSONObject: uploadDataAsDictionary, options: [])
             
             // Create upload Task
-            let dataTask = sharedSession.uploadTask(with: request, from: uploadData, completionHandler: { (data, response, error) -> Void in
+            let task = URLSession.shared.uploadTask(with: request, from: uploadData, completionHandler: { (data, response, error) -> Void in
                 
-                trace("in uploadBgReadingsToDexcomShare, in uploadTask completionHandler", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
+                trace("in uploadBgReadingsToDexcomShare, finished task", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
                 
                 // error cases
                 if let error = error {
@@ -386,10 +395,7 @@ class DexcomShareUploadManager:NSObject {
                         if data.count == 0 {
                             
                             // success
-                            if let lastReading = bgReadingsToUpload.first {
-                                trace("    upload succeeded, setting timeStampLatestDexcomShareUploadedBgReading to %{public}@", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info, lastReading.timeStamp.description(with: .current))
-                                UserDefaults.standard.timeStampLatestDexcomShareUploadedBgReading = lastReading.timeStamp
-                            }
+                            self.setTimeStampLastReadingToUpload(timeStampLastReadingToUpload: timeStampLastReadingToUpload)
                             
                             return
 
@@ -427,7 +433,7 @@ class DexcomShareUploadManager:NSObject {
                                             if success {
                                                 trace("in uploadBgReadingsToDexcomShare, new login successful", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
                                                 // retry the upload
-                                                self.uploadBgReadingsToDexcomShare(firstAttempt: false)
+                                                self.uploadBgReadingsToDexcomShare(firstAttempt: false, lastConnectionStatusChangeTimeStamp: lastConnectionStatusChangeTimeStamp)
                                             } else {
                                                 trace("in uploadBgReadingsToDexcomShare, new login failed", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .error)
                                             }
@@ -439,7 +445,7 @@ class DexcomShareUploadManager:NSObject {
                                 } else if errorCode == "MonitoringSessionNotActive" {
                                     // call startRemoteMonitoringSessionAndStartUpload in main thread
                                     DispatchQueue.main.async {
-                                        self.startRemoteMonitoringSessionAndStartUpload()
+                                        self.startRemoteMonitoringSessionAndStartUpload(lastConnectionStatusChangeTimeStamp: lastConnectionStatusChangeTimeStamp)
                                     }
                                     return
                                     
@@ -474,10 +480,8 @@ class DexcomShareUploadManager:NSObject {
                             }
                             
                             // success
-                            if let lastReading = bgReadingsToUpload.first {
-                                trace("    upload succeeded, setting timeStampLatestDexcomShareUploadedBgReading to %{public}@", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info, lastReading.timeStamp.description(with: .current))
-                                UserDefaults.standard.timeStampLatestDexcomShareUploadedBgReading = lastReading.timeStamp
-                            }
+                            self.setTimeStampLastReadingToUpload(timeStampLastReadingToUpload: timeStampLastReadingToUpload)
+                            
                             return
                         }
                     } else {
@@ -485,10 +489,8 @@ class DexcomShareUploadManager:NSObject {
                         // don't think we should every come here
                         trace("    no data received, considered successful upload", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .error)
 
-                        if let lastReading = bgReadingsToUpload.first {
-                            trace("    upload succeeded, setting timeStampLatestDexcomShareUploadedBgReading to %{public}@", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info, lastReading.timeStamp.description(with: .current))
-                            UserDefaults.standard.timeStampLatestDexcomShareUploadedBgReading = lastReading.timeStamp
-                        }
+                        self.setTimeStampLastReadingToUpload(timeStampLastReadingToUpload: timeStampLastReadingToUpload)
+                        
                         return
                         
                     }
@@ -500,7 +502,8 @@ class DexcomShareUploadManager:NSObject {
                 
             })
             
-            dataTask.resume()
+            trace("in uploadBgReadingsToDexcomShare, calling task.resume", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
+            task.resume()
             
         } catch let error {
             trace("     failed to upload, error = %{public}@", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info, error.localizedDescription)
@@ -509,6 +512,15 @@ class DexcomShareUploadManager:NSObject {
 
     }
     
+    /// sets UserDefaults.standard.timeStampLatestDexcomShareUploadedBgReading = timeStampLastReadingToUpload, if not nil
+    private func setTimeStampLastReadingToUpload(timeStampLastReadingToUpload: Date?) {
+        
+        if let timeStampLastReadingToUpload = timeStampLastReadingToUpload {
+            trace("    upload succeeded, setting timeStampLatestDexcomShareUploadedBgReading to %{public}@", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info, timeStampLastReadingToUpload.description(with: .current))
+            UserDefaults.standard.timeStampLatestDexcomShareUploadedBgReading = timeStampLastReadingToUpload
+        }
+        
+    }
     
     /// test dexcom share credentials (accountname, password) - the credentials must be not nil in userdefaults, otherwise completion is called with error
     ///
@@ -547,9 +559,9 @@ class DexcomShareUploadManager:NSObject {
             let sharedSession = URLSession.shared
             
             // Create upload Task
-            let dataTask = sharedSession.uploadTask(with: request, from: uploadData, completionHandler: { (data, response, error) -> Void in
+            let task = sharedSession.uploadTask(with: request, from: uploadData, completionHandler: { (data, response, error) -> Void in
                 
-                trace("    in uploadTask completionHandler", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
+                trace("in loginAndStoreSessionId, finished task", log: self.log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
                 
                 // error cases
                 if let error = error {
@@ -620,7 +632,8 @@ class DexcomShareUploadManager:NSObject {
                 
             })
             
-            dataTask.resume()
+            trace("in loginAndStoreSessionId, calling task.resume", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info)
+            task.resume()
 
         } catch let error {
             trace("     %{public}@", log: log, category: ConstantsLog.categoryDexcomShareUploadManager, type: .info, error.localizedDescription)

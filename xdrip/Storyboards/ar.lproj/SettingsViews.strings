@@ -14,12 +14,6 @@
 "settingsviews_transmitterid" = "رقم هوية جهاز الإرسال:";
 "settingsviews_givetransmitterid" = "أدخل رقم هوية جهاز الإرسال";
 "settingsviews_resettransmitter" = "إعادة تعيين جهاز الإرسال";
-"settingsviews_webooptransmitter" = "استخدم خوارزمية OOPWeb ؟";
-"settingsviews_labelWebOOPSite" = "رابط موقع OOPWeb :";
-"settingsviews_labelWebOOPtoken" = "رمز OOPWeb :";
-"settingsviews_labelWebOOPSiteExplainingText" = "رابط موقع OOPWeb (اختياري):";
-"settingsviews_labelWebOOPtokenExplainingText" = "رمز OOPWeb (اختياري):";
-"labelWebOOP" = "خوارزمية OOPWeb";
 "transmitterId8OrHigherNotSupported" = "جهاز الإرسال برمز الهوية 8Gxxxx أو الأحدث غير مدعوم!";
 "settingsviews_sectiontitlealerting" = "التنبيهات";
 "settingsviews_row_alert_types" = "أنواع التنبيهات";
@@ -46,7 +40,7 @@
 "timeScheduleViewTitle" = "جدولة وقت تفعيل/إغلاق لـ";
 "uploadSensorStartTime" = "تحميل بداية وقت الحساس؟";
 "testUrlAndAPIKey" = "اختبار رابط منصة نايتسكاوت و API_SECRET؟ ";
-"settingsviews_sectiontitlespeak" = "الصوت";
+"settingsviews_sectiontitlespeak" = "النطق";
 "settingsviews_speakBgReadings" = "نطق قراءات السكر؟";
 "settingsviews_speakBgReadingslanguage" = "اللغة:";
 "settingsviews_speakreadingslanguageselection" = "اختر اللغة";
@@ -71,9 +65,81 @@
 "displayDeltaInCalendarEvent" = "عرض الفرق؟";
 "infoCalendarAccessDeniedByUser" = "لقد رفضت الوصول إلى التقويم الخاص بك مسبقًا.\n\nلتمكينه ، انتقل إلى إعدادات جهازك ثم الخصوصية ثم التقويم ثم قم بتمكينه.";
 "infoCalendarAccessRestricted" = "لا يمكنك منح إذن لـ xDrip4iOS للوصول إلى التقويم الخاص بك. قد يكون هذا بسبب القيود النشطة مثل وجود أدوات الرقابة الأبوية.";
-"writeTraceToFile" = "كتابة التتبع إلى ملف؟";
-"sectionTitleTrace" = "تتبع";
-"sendTraceFile" = "إرسال ملف التتبع";
+"sectionTitleTrace" = "الإبلاغ عن المشاكل";
+"sendTraceFile" = "إرسال تقرير المشكلة";
 "describeProblem" = "اشرح سبب حاجتك لإرسال ملف التتبع بأكبر قدر ممكن من التفاصيل. إذا كنت قد ذكرت بالفعل مشكلتك في مجموعة دعم الفيسبوك xDrip4iOS، اذكر اسم الفيسبوك الخاص بك في البريد الإلكتروني";
+"emailNotConfigured" = "يجب عليك تفعيل حساب البريد الإلكتروني على جهازك.";
 "emailbodyText" = "وصف المشكلة: ";
 "failedToSendEmail" = "فشل في إرسال البريد الإلكتروني";
+"volumeTestSoundPlayerExplanation" = "يتم الآن تشغيل صوت التنبيه بنفس مستوى الصوت الذي سيتم استخدامه لنوع التنبيه مع تفعيل 'تجاوز وضع الصامت'  \ n \ n (يستخدم لجميع الإنذارات باستثناء تنبيهات القراءات المفقودة والتي دائماً تستخدم مستوى الصوت لجهاز.) \ n \ n قم بتغيير مستوى الصوت باستخدام أزرار الصوت واضغط على موافق عند الانتهاء.";
+"volumeTestiOSSoundExplanation" = "يتم الآن تشغيل صوت التنبيه بنفس الحجم الذي سيتم استخدامه لنوع التنبيه مع عدم تفعيل 'تجاوزوضع الصامت' \ n \ n (يستخدم أيضًا دائمًا لإنذارات القراءات المفقودة والتي تستخدم مستوى صوت الجهاز.) \ n \ n اضغط على واحد من أزرار الصوت لإيقاف الصوت ، ثم قم بتغيير مستوى الصوت باستخدام أزرار الصوت إلى مستوى الصوت المطلوب واختبره مرة أخرى.";
+"volumeTestSoundPlayer" = "اختبار مستوى الصوت (مع تفعيل تجاوز وضع الصامت)";
+"volumeTestiOSSound" = "اختبار مستوى الصوت (مستوى الصوت الحالي للآيفون)";
+"debugLevel" = "تضمين مستوى التصحيح";
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////   Translation needed - remove this header after translation                       /////
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+/// home screen settings, urgent high value
+"settingsviews_urgentHighValue" = "Urgent High Value:";
+
+/// 
+"settingsviews_urgentLowValue" = "Urgent Low Value:";
+
+/// non fixed calibration slopes settings in bluetooth peripheral view : enabled or not
+"settingsviews_nonfixedtransmitter" = "Enable Multi-point Calibration?";
+
+/// home screen settings, use objectives in graph
+"settingsviews_useobjectives" = "Show Objectives in Graph?";
+
+/// non fixed settings, title of the section
+"settingsviews_labelNonFixed" = "Multi-point Calibration";
+
+/// 
+"settingsviews_showcoloredobjectives" = "Show Colored Lines?";
+
+/// nightscout settings, port to use
+"nightScoutPort" = "Port (optional):";
+
+/// general settings, when switching from master to follower, if confirmation is asked, this message will be shown.
+"warningChangeFromMasterToFollower" = "Switching from master to follower will stop your current sensor. Do you want to continue?";
+
+/// home screen settings, show target line
+"settingsviews_showtarget" = "Show Target Line?";
+
+/// about settings, section title
+"settingsviews_sectiontitleAbout" = "About xDrip4iOS";
+
+/// web oop settings in bluetooth peripheral view : enabled or not
+"settingsviews_webooptransmitter" = "Use Libre Algorithm?";
+
+/// 
+"settingsviews_labelWebOOP" = "xDrip or Libre Algorithm";
+
+/// home screen settings, target value
+"settingsviews_targetValue" = "Target Value:";
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////   Translation needed - remove this header after translation                       /////
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+/// deloper settings, row title for 'Smooth Libre Values?'
+"smoothLibreValues" = "Smooth Libre Values?";
+
+/// deloper settings, row title for OSLog - with OSLog enabled, a developer can view log information as explained here https://developer.apple.com/documentation/os/oslog
+"oslog" = "OSLog";
+
+/// deloper settings, row title for NSLog - with NSLog enabled, a developer can view log information as explained here https://github.com/JohanDegraeve/xdripswift/wiki/NSLog
+"nslog" = "NSLog";
+
+/// Developer Settings, section title
+"developerSettings" = "Developer Settings";
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////   Translation needed - remove this header after translation                       /////
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+/// home screen settings, section title
+"settingsviews_sectiontitlehomescreen" = "Home Screen";

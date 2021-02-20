@@ -21,14 +21,13 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>3874</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NFCReaderUsageDescription</key>
+	<string>xDrip4iOS uses NFC to scan Libre sensors.</string>
 	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
+	<dict/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Connect to CGM Transmitter and M5Stack</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>

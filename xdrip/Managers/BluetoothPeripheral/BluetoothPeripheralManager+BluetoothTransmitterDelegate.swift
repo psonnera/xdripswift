@@ -66,7 +66,7 @@ extension BluetoothPeripheralManager: BluetoothTransmitterDelegate {
         // If the app is already in the foreground, then userNotificationCenter willPresent will be called, in this function the closure will be removed immediately, and the pairing request will be called. As a result, if the app is in the foreground, the user will not see (or hear) any notification, but the pairing will be initiated
         
         // max timestamp when notification was fired - connection stays open for 1 minute, taking 1 second as d
-        let maxTimeUserCanOpenApp = Date(timeIntervalSinceNow: TimeInterval(ConstantsDexcomG5.maxTimeToAcceptPairingInSeconds - 1))
+        let maxTimeUserCanOpenApp = Date(timeIntervalSinceNow: TimeInterval(Double(ConstantsDexcomG5.maxTimeToAcceptPairingInSeconds) - 1.0))
         
         // we will not just count on it that the user will click the notification to open the app (assuming the app is in the background, if the app is in the foreground, then we come in another flow)
         // whenever app comes from-back to foreground, updateLabelsAndChart needs to be called
@@ -195,13 +195,15 @@ extension BluetoothPeripheralManager: BluetoothTransmitterDelegate {
                 trace("in didConnect, transmitter address already known. This is not a new device, will disconnect", log: log, category: ConstantsLog.categoryBluetoothPeripheralManager, type: .info)
                 
                 // It's an already known BluetoothTransmitter, not storing this, on the contrary disconnecting because maybe it's a bluetoothTransmitter already known for which user has preferred not to connect to
+                // but before that store the current bluetoothTransmitterDelegate
+                let bluetoothTransmitterDelegate = bluetoothTransmitter.bluetoothTransmitterDelegate
                 bluetoothTransmitter.disconnect()
                 
                 // If we're actually waiting for a new scan result, then there's an instance of BluetoothTransmitter stored in tempBlueToothTransmitterWhileScanningForNewBluetoothPeripheral - but this one stopped scanning, so let's recreate an instance of BluetoothTransmitter
                 // transmitterTypeBeingScannedFor should be non nil here, unwrap
                 if let transmitterTypeBeingScannedFor = transmitterTypeBeingScannedFor {
 
-                    self.tempBlueToothTransmitterWhileScanningForNewBluetoothPeripheral = createNewTransmitter(type: transmitterTypeBeingScannedFor, transmitterId: buetoothPeripheral.blePeripheral.transmitterId)
+                    self.tempBlueToothTransmitterWhileScanningForNewBluetoothPeripheral = createNewTransmitter(type: transmitterTypeBeingScannedFor, transmitterId: buetoothPeripheral.blePeripheral.transmitterId, bluetoothTransmitterDelegate: bluetoothTransmitterDelegate)
                     
                     _ = self.tempBlueToothTransmitterWhileScanningForNewBluetoothPeripheral?.startScanning()
 
@@ -215,8 +217,12 @@ extension BluetoothPeripheralManager: BluetoothTransmitterDelegate {
         // it's a new peripheral that we will store. No need to continue scanning
         bluetoothTransmitter.stopScanning()
         
+        trace("in didconnect to, going to create a new bluetoothperipheral", log: log, category: ConstantsLog.categoryBluetoothPeripheralManager, type: .info)
+        
         // create bluetoothPeripheral
         let newBluetoothPeripheral = getTransmitterType(for: tempBlueToothTransmitterWhileScanningForNewBluetoothPeripheral).createNewBluetoothPeripheral(withAddress: deviceAddressNewTransmitter, withName: deviceNameNewTransmitter, nsManagedObjectContext: coreDataManager.mainManagedObjectContext)
+        
+        trace("in didconnect to, created a new bluetoothperipheral", log: log, category: ConstantsLog.categoryBluetoothPeripheralManager, type: .info)
         
         // add new bluetoothPeripheral and bluetoothTransmitter to array of bluetoothPeripherals and bluetoothTransmitters
         bluetoothTransmitters.insert(bluetoothTransmitter, at: insertInBluetoothPeripherals(bluetoothPeripheral: newBluetoothPeripheral))

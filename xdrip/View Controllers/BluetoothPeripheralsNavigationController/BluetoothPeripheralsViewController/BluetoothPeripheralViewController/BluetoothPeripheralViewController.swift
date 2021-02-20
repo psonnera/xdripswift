@@ -23,8 +23,6 @@ fileprivate enum Setting:Int, CaseIterable {
     /// timestamp when connection changed to connected or not connected
     case connectOrDisconnectTimeStamp = 4
     
-    /// ANY NEW SETTINGS SHOULD BE INSERTED HERE
-    
     /// transmitterID, only for devices that need it
     case transmitterId = 5
 
@@ -35,11 +33,12 @@ fileprivate enum WebOOPSettings: Int, CaseIterable {
     /// is web OOP enabled or not
     case webOOPEnabled = 0
     
-    /// if webOOP enabled, what site to use
-    case webOOPsite = 1
+}
+
+fileprivate enum NonFixedCalibrationSlopesSettings: Int, CaseIterable {
     
-    /// if webOOP enabled, value of the token
-    case webOOPtoken = 2
+    /// is non fixed slope enabled or not
+    case nonFixedSlopeEnabled = 0
 
 }
 
@@ -96,7 +95,18 @@ class BluetoothPeripheralViewController: UIViewController {
     private var isScanning: Bool = false
     
     /// in which section do we find the weboop settings, if enabled
-    private let webOOPSettingsSectionNumber = 1
+    ///
+    /// this value assumes that if webOOPSettingsSection is shown then also nonFixedSettings section is shown
+    private let webOOPSettingsSectionNumber = 2
+    
+    /// is the webOOPSettingsSection currently shown or not
+    private var webOOPSettingsSectionIsShown = false
+    
+    /// in which section do we find the non fixed calibration slopes setting, if enabled
+    private let nonFixedSettingsSectionNumber = 1
+    
+    /// is the nonFixedSettingsSection currently shown or not
+    private var nonFixedSettingsSectionIsShown = false
     
     /// when user starts scanning, info will be shown in UIAlertController. This will be
     private var infoAlertWhenScanningStarts: UIAlertController?
@@ -225,16 +235,40 @@ class BluetoothPeripheralViewController: UIViewController {
         
     }
     
-    /// the BluetoothPeripheralViewController has already a few sections defined (eg bluetooth, weboop). This is the amount of sections defined in BluetoothPeripheralViewController. T
+    /// the BluetoothPeripheralViewController has already a few sections defined (eg bluetooth, weboop). This is the amount of sections defined in BluetoothPeripheralViewController.
     public func numberOfGeneralSections() -> Int {
         
-        // if it's a cgm transmitter type that supports web oop, and if bluetoothPeripheral already known, then show the webOOP section
-        if let expectedBluetoothPeripheralType = expectedBluetoothPeripheralType, expectedBluetoothPeripheralType.canWebOOP(), bluetoothPeripheral != nil {
+        // first check if bluetoothPeripheral already known
+        if bluetoothPeripheral != nil {
+
+            // bluetoothPeripheral already known
             
-            return 2
+            // if it's a cgm transmitter type that supports web oop and non fixed slopes
+            // then show the webOOP section and nonFixed section
+            if let expectedBluetoothPeripheralType = expectedBluetoothPeripheralType, expectedBluetoothPeripheralType.canWebOOP(), expectedBluetoothPeripheralType.canUseNonFixedSlope() {
+                
+                // mark web oop and non fixed slope settings sections as shown
+                webOOPSettingsSectionIsShown = true
+                nonFixedSettingsSectionIsShown = true
+                
+                return 3
+                
+                // if bluetoothPeripheral already known,
+                // and it's a cgm transmitter type that supports non fixed slopes but doesn't support weboop
+                // then show only the nonFixed section
+            } else if let expectedBluetoothPeripheralType = expectedBluetoothPeripheralType, expectedBluetoothPeripheralType.canUseNonFixedSlope() {
+                
+                // mark web oop and non fixed slope settings sections as not shown
+                webOOPSettingsSectionIsShown = false
+                nonFixedSettingsSectionIsShown = true
+                
+                return 2
+                
+            }
             
         }
-
+        
+        // bluetoothPeripheral not yet known, only show first section with name alias, ...
         return 1
         
     }
@@ -365,7 +399,7 @@ class BluetoothPeripheralViewController: UIViewController {
         // initiailize previousScanningResult to nil
         previousScanningResult = nil
         
-        bluetoothPeripheralManager.startScanningForNewDevice(type: type, transmitterId: transmitterIdTempValue, callBackForScanningResult: handleScanningResult(startScanningResult:), callback: { (bluetoothPeripheral) in
+        bluetoothPeripheralManager.startScanningForNewDevice(type: type, transmitterId: transmitterIdTempValue, bluetoothTransmitterDelegate: self, callBackForScanningResult: handleScanningResult(startScanningResult:), callback: { (bluetoothPeripheral) in
 
             // remove info alert screen which may still be there
             self.dismissInfoAlertWhenScanningStarts()
@@ -717,27 +751,42 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
             
             return numberOfRows
             
-        } else if section == 1  {
-            
-            // if the bluetoothperipheral type supports oopweb then this is the oop web section
-            if expectedBluetoothPeripheralType.canWebOOP() {
+        } else if numberOfGeneralSections() > 1 {
 
-                // check if weboopenabled and if yes return the number of settings in that section
-                if let bluetoothPeripheral = bluetoothPeripheral {
+            // the oop web and non-fixed slope sections are maybe present
+            
+            if section == 1 {
+                
+                // if the bluetoothperipheral type supports non fixed then this is the non fixed
+                if expectedBluetoothPeripheralType.canUseNonFixedSlope() {
                     
-                    if bluetoothPeripheral.blePeripheral.webOOPEnabled {
-                        return WebOOPSettings.allCases.count
-                    }
+                    return 1;
+                    
                 }
                 
-                // weboop supported by the peripheral but not enabled
-                return 1
-
+            } else if section == 2  {
+                
+                // if the bluetoothperipheral type supports oopweb then this is the oop web section
+                if expectedBluetoothPeripheralType.canWebOOP() {
+                    
+                    // check if weboopenabled and if yes return the number of settings in that section
+                    if let bluetoothPeripheral = bluetoothPeripheral {
+                        
+                        if bluetoothPeripheral.blePeripheral.webOOPEnabled {
+                            return WebOOPSettings.allCases.count
+                        }
+                    }
+                    
+                    // weboop supported by the peripheral but not enabled
+                    return 1
+                    
+                }
+                
             }
-            
-        }
 
-        // it's not section 0 and it's not section 1 && weboop supported
+        }
+        
+        // it's not section 0 and it's not section 2 && weboop supported and it's not section 1 && nonfixed supported
         
         // this is the section with the transmitter specific settings
         // unwrap bluetoothPeripheralViewModel
@@ -757,10 +806,10 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
         guard let bluetoothPeripheralManager = bluetoothPeripheralManager, let expectedBluetoothPeripheralType = expectedBluetoothPeripheralType else {return cell}
         
         // check if it's a Setting defined here in BluetoothPeripheralViewController, or a setting specific to the type of BluetoothPeripheral
-        if (indexPath.section >= 1 && !expectedBluetoothPeripheralType.canWebOOP()) || (indexPath.section >= 2), let bluetoothPeripheralViewModel = bluetoothPeripheralViewModel {
+        if indexPath.section >= numberOfGeneralSections() {
             
             // it's a setting not defined here but in a BluetoothPeripheralViewModel
-            if let bluetoothPeripheral = bluetoothPeripheral {
+            if let bluetoothPeripheral = bluetoothPeripheral, let bluetoothPeripheralViewModel = bluetoothPeripheralViewModel {
 
                 bluetoothPeripheralViewModel.update(cell: cell, forRow: indexPath.row, forSection: indexPath.section, for: bluetoothPeripheral)
                 
@@ -839,7 +888,7 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
                         
                     }
                     
-                    cell.detailTextLabel?.text = lastConnectionStatusChangeTimeStamp.toShortString()
+                    cell.detailTextLabel?.text = lastConnectionStatusChangeTimeStamp.toString(timeStyle: .short, dateStyle: .short)
                     
                 } else {
                     cell.textLabel?.text = Texts_BluetoothPeripheralView.connectedAt
@@ -848,7 +897,50 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
 
             }
 
-        }  else {
+        } else if indexPath.section == 1 {
+            // non fixed calibration slope settings
+            
+            guard let setting = NonFixedCalibrationSlopesSettings(rawValue: indexPath.row) else { fatalError("BluetoothPeripheralViewController cellForRowAt, Unexpected setting, row = " + indexPath.row.description) }
+            switch setting {
+                
+            case .nonFixedSlopeEnabled:
+                
+                cell.textLabel?.text = Texts_SettingsView.labelNonFixedTransmitter
+                cell.detailTextLabel?.text = nil
+                
+                var currentStatus = false
+                if let bluetoothPeripheral = bluetoothPeripheral {
+                    currentStatus = bluetoothPeripheral.blePeripheral.nonFixedSlopeEnabled
+                }
+                
+                cell.accessoryView = UISwitch(isOn: currentStatus, action: { (isOn:Bool) in
+                    
+                    self.bluetoothPeripheral?.blePeripheral.nonFixedSlopeEnabled = isOn
+                    
+                    // send info to bluetoothPeripheralManager
+                    if let bluetoothPeripheral = self.bluetoothPeripheral {
+
+                        bluetoothPeripheralManager.receivedNewValue(nonFixedSlopeEnabled: isOn, for: bluetoothPeripheral)
+
+                        tableView.reloadSections(IndexSet(integer: self.nonFixedSettingsSectionNumber), with: .none)
+
+                    }
+                    
+                })
+                
+                // if it's a bluetoothPeripheral that uses oop web, then the setting can not be changed
+                if let bluetoothPeripheral = self.bluetoothPeripheral {
+                    if bluetoothPeripheral.blePeripheral.webOOPEnabled {
+                        
+                        cell.accessoryView?.isUserInteractionEnabled = false
+                        
+                    }
+                }
+
+                cell.accessoryType = .none
+                
+            }
+        }  else if indexPath.section == 2 {
             
             // web oop settings
             
@@ -859,15 +951,19 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
                 
             case .webOOPEnabled:
                 
+                // set row text and set default row label to nil
                 cell.textLabel?.text = Texts_SettingsView.labelWebOOPTransmitter
                 cell.detailTextLabel?.text = nil
                 
-                var currentStatus = false
+                // get current value of webOOPEnabled, default false
+                var currentWebOOPEnabledValue = false
                 if let bluetoothPeripheral = bluetoothPeripheral {
-                    currentStatus = bluetoothPeripheral.blePeripheral.webOOPEnabled
+                    
+                    currentWebOOPEnabledValue = bluetoothPeripheral.blePeripheral.webOOPEnabled
+                    
                 }
                 
-                cell.accessoryView = UISwitch(isOn: currentStatus, action: { (isOn:Bool) in
+                cell.accessoryView = UISwitch(isOn: currentWebOOPEnabledValue, action: { (isOn:Bool) in
                     
                     self.bluetoothPeripheral?.blePeripheral.webOOPEnabled = isOn
                     
@@ -877,24 +973,25 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
                         bluetoothPeripheralManager.receivedNewValue(webOOPEnabled: isOn, for: bluetoothPeripheral)
                         
                         tableView.reloadSections(IndexSet(integer: self.webOOPSettingsSectionNumber), with: .none)
+                        
+                        
+                        // if user switches on web oop, then we need to force also use of non-fixed slopes to off
+                        if isOn {
+
+                            bluetoothPeripheral.blePeripheral.nonFixedSlopeEnabled = false
+                            
+                            bluetoothPeripheralManager.receivedNewValue(nonFixedSlopeEnabled: false, for: bluetoothPeripheral)
+                            
+                        }
+
+                        // reload the section for nonFixedSettingsSectionNumber, even though the value may not have changed, because possibly isUserInteractionEnabled needs to be set to false for the nonFixedSettingsSectionNumber UISwitch
+                        tableView.reloadSections(IndexSet(integer: self.nonFixedSettingsSectionNumber), with: .none)
 
                     }
                     
                 })
                 
                 cell.accessoryType = .none
-                
-            case .webOOPsite:
-                
-                cell.textLabel?.text = Texts_SettingsView.labelWebOOPSite
-                cell.detailTextLabel?.text = bluetoothPeripheral?.blePeripheral.oopWebSite
-                cell.accessoryType = .disclosureIndicator
-                
-            case .webOOPtoken:
-                
-                cell.textLabel?.text = Texts_SettingsView.labelWebOOPtoken
-                cell.detailTextLabel?.text = bluetoothPeripheral?.blePeripheral.oopWebToken
-                cell.accessoryType = .disclosureIndicator
                 
             }
             
@@ -909,10 +1006,10 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
         tableView.deselectRow(at: indexPath, animated: true)
         
         // unwrap a few needed variables
-        guard let bluetoothPeripheralManager = bluetoothPeripheralManager, let bluetoothPeripheralViewModel = bluetoothPeripheralViewModel, let expectedBluetoothPeripheralType = expectedBluetoothPeripheralType else {return}
+        guard let bluetoothPeripheralManager = bluetoothPeripheralManager, let bluetoothPeripheralViewModel = bluetoothPeripheralViewModel else {return}
         
         // check if it's one of the common settings or one of the peripheral type specific settings
-        if (indexPath.section >= 1 && !expectedBluetoothPeripheralType.canWebOOP()) || (indexPath.section >= 2) {
+        if indexPath.section >= numberOfGeneralSections() {
           
             // it's a setting not defined here but in a BluetoothPeripheralViewModel
             // bluetoothPeripheralViewModel should not be nil here, otherwise user wouldn't be able to click a row which is higher than maximum
@@ -927,8 +1024,8 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
             
         }
         
-        //it's a Setting defined here in BluetoothPeripheralViewController
-        // is it a bluetooth setting or web oop setting ?
+        // it's a Setting defined here in BluetoothPeripheralViewController
+        // is it a bluetooth setting or web oop setting  or non-fixed calibration slopes setting ?
         
         if indexPath.section == 0 {
             
@@ -1002,7 +1099,18 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
                 requestTransmitterId()
             }
             
-        } else {
+        } else if indexPath.section == 1 {
+            // non fixed slopes settings
+            
+            guard let setting = NonFixedCalibrationSlopesSettings(rawValue: indexPath.row) else { fatalError("BluetoothPeripheralViewController didSelectRowAt, Unexpected setting") }
+            
+            switch setting {
+                
+            case .nonFixedSlopeEnabled:
+                // this is a uiswitch, user needs to click the uiswitch, not just the row
+                return
+            }
+        } else if indexPath.section == 2 {
             
             // web oop settings
             
@@ -1014,45 +1122,6 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
                 // this is a uiswitch, user needs to click the uiswitch, not just the row
                 return
                 
-            case .webOOPsite:
-                
-                // this option should only be shown if there's already a bluetoothPeripheral assigned
-                guard let bluetoothPeripheral = bluetoothPeripheral else {return}
-                
-                SettingsViewUtilities.runSelectedRowAction(selectedRowAction: SettingsSelectedRowAction.askText(title: Texts_SettingsView.labelWebOOP, message: Texts_SettingsView.labelWebOOPSiteExplainingText, keyboardType: .URL, text: bluetoothPeripheral.blePeripheral.oopWebSite, placeHolder: Texts_Common.default0, actionTitle: nil, cancelTitle: nil, actionHandler: {(oopwebsiteurl:String) in
-                    
-                    if oopwebsiteurl != bluetoothPeripheral.blePeripheral.oopWebSite {
-                        
-                        // store in nsobject
-                        bluetoothPeripheral.blePeripheral.oopWebSite = oopwebsiteurl.toNilIfLength0()
-                        
-                        // send new value to bluetoothPeripheralManager
-                        bluetoothPeripheralManager.receivedNewValue(oopWebSite: oopwebsiteurl.toNilIfLength0(), for: bluetoothPeripheral)
-                        
-                    }
-                    
-                }, cancelHandler: nil, inputValidator: nil), forRowWithIndex: indexPath.row, forSectionWithIndex: indexPath.section, withSettingsViewModel: nil, tableView: tableView, forUIViewController: self)
-                
-            case .webOOPtoken:
-                
-                // this option should only be shown if there's already a bluetoothPeripheral assigned
-                guard let bluetoothPeripheral = bluetoothPeripheral else {return}
-                
-                SettingsViewUtilities.runSelectedRowAction(selectedRowAction: SettingsSelectedRowAction.askText(title: Texts_SettingsView.labelWebOOP, message: Texts_SettingsView.labelWebOOPtokenExplainingText, keyboardType: .default, text: bluetoothPeripheral.blePeripheral.oopWebToken, placeHolder: Texts_Common.default0, actionTitle: nil, cancelTitle: nil, actionHandler: {(oopwebsitetoken:String) in
-                    
-                    if oopwebsitetoken != bluetoothPeripheral.blePeripheral.oopWebToken {
-                        
-                        // store in nsobject
-                        bluetoothPeripheral.blePeripheral.oopWebToken = oopwebsitetoken.toNilIfLength0()
-                        
-                        // send new value to bluetoothPeripheralManager
-                        bluetoothPeripheralManager.receivedNewValue(oopWebToken: oopwebsitetoken.toNilIfLength0(), for: bluetoothPeripheral)
-                        
-                    }
-                    
-                }, cancelHandler: nil, inputValidator: nil), forRowWithIndex: indexPath.row, forSectionWithIndex: indexPath.section, withSettingsViewModel: nil, tableView: tableView, forUIViewController: self)
-                
-
             }
         
         }
@@ -1062,28 +1131,34 @@ extension BluetoothPeripheralViewController: UITableViewDataSource, UITableViewD
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         
         // unwrap variables
-        guard let bluetoothPeripheralViewModel = bluetoothPeripheralViewModel, let expectedBluetoothPeripheralType = expectedBluetoothPeripheralType else {return nil}
+        guard let bluetoothPeripheralViewModel = bluetoothPeripheralViewModel else {return nil}
 
         if section == 0 {
             
             // title for first section
             return Texts_SettingsView.m5StackSectionTitleBluetooth
             
-        } else if (section >= 1 && !expectedBluetoothPeripheralType.canWebOOP()) || (section >= 2) {
+        } else if section >= numberOfGeneralSections() {
             
-            // title for bluetoothperipheral type section
+            // title defined in viewmodel
             return bluetoothPeripheralViewModel.sectionTitle(forSection: section)
 
-        } else {
+        } else if section == 2 {
             
             // web oop section
             return Texts_SettingsView.labelWebOOP
             
+        } else { //if section == 1
+            
+            // non fixed section
+            return Texts_SettingsView.labelNonFixed
+            
         }
-        
     }
     
 }
+
+// MARK: - extension BluetoothTransmitterDelegate
 
 extension BluetoothPeripheralViewController: BluetoothTransmitterDelegate {
     
